@@ -35,7 +35,7 @@ jobs:
         helm list --namespace scores
         helm upgrade --install scores devops/helm/scores \
         --set tag=${{ inputs.image_tag }} \
-        --set hostname=scores.fallday.com \
+        --set hostname=scores.fallday.ca \
         --namespace scores \
         --wait \
         --timeout 5m
