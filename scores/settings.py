@@ -24,6 +24,13 @@ ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(','
 if _site_host and _site_host not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(_site_host)
 
+# CSRF trusted origins for HTTPS
+# Uses SITE_URL by default, can be extended via CSRF_TRUSTED_ORIGINS env var
+CSRF_TRUSTED_ORIGINS = [SITE_URL]
+_extra_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if _extra_origins:
+    CSRF_TRUSTED_ORIGINS.extend(_extra_origins.split(','))
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
