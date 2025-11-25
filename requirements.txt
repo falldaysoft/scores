@@ -1,0 +1,8 @@
+asgiref==3.11.0
+Django==5.2.8
+django-extensions==4.1
+django-htmx==1.26.0
+djangorestframework==3.16.1
+psycopg2-binary==2.9.11
+python-dotenv==1.2.1
+sqlparse==0.5.3

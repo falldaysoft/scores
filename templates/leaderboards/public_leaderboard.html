@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}{{ leaderboard.name }} - {{ game.name }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-12">
+    <!-- Header -->
+    <div class="text-center mb-12">
+        <a href="{% url 'public_game' game_slug=game.slug %}" class="text-indigo-600 hover:underline text-sm">&larr; {{ game.name }}</a>
+        <h1 class="text-4xl font-bold text-gray-900 mt-4">{{ leaderboard.name }}</h1>
+        {% if leaderboard.description %}
+        <p class="mt-4 text-lg text-gray-600">{{ leaderboard.description }}</p>
+        {% endif %}
+        <p class="mt-2 text-sm text-gray-500">
+            {{ leaderboard.get_sort_order_display }} &bull; Scores expire after 7 days
+        </p>
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        {% if scores %}
+        <table class="min-w-full">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="py-4 px-6 text-left text-sm font-semibold text-gray-900">Rank</th>
+                    <th class="py-4 px-6 text-left text-sm font-semibold text-gray-900">Player</th>
+                    <th class="py-4 px-6 text-right text-sm font-semibold text-gray-900">Score</th>
+                    <th class="py-4 px-6 text-right text-sm font-semibold text-gray-900">Date</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+                {% for score in scores %}
+                <tr class="{% if forloop.counter <= 3 %}bg-gradient-to-r {% if forloop.counter == 1 %}from-yellow-50 to-transparent{% elif forloop.counter == 2 %}from-gray-100 to-transparent{% elif forloop.counter == 3 %}from-amber-50 to-transparent{% endif %}{% endif %}">
+                    <td class="py-4 px-6">
+                        {% if forloop.counter == 1 %}
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-400 text-white font-bold text-sm">1</span>
+                        {% elif forloop.counter == 2 %}
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-300 text-white font-bold text-sm">2</span>
+                        {% elif forloop.counter == 3 %}
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-amber-600 text-white font-bold text-sm">3</span>
+                        {% else %}
+                        <span class="text-gray-500 font-medium pl-2">{{ forloop.counter }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="py-4 px-6 font-medium text-gray-900">{{ score.player_name }}</td>
+                    <td class="py-4 px-6 text-right font-mono text-lg {% if forloop.counter <= 3 %}font-bold text-gray-900{% else %}text-gray-700{% endif %}">
+                        {{ score.score|floatformat:0 }}
+                    </td>
+                    <td class="py-4 px-6 text-right text-sm text-gray-500">{{ score.created_at|timesince }} ago</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-16">
+            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+            </svg>
+            <p class="mt-4 text-gray-500">No scores yet. Be the first to submit!</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- API Info -->
+    <div class="mt-8 bg-gray-50 rounded-xl p-6">
+        <h3 class="font-semibold text-gray-900 mb-3">API Access</h3>
+        <p class="text-sm text-gray-600 mb-3">Get this leaderboard data via our public API:</p>
+        <code class="block bg-white px-4 py-3 rounded-lg text-sm font-mono text-gray-800 border border-gray-200">
+            GET https://scores.fallday.ca/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/
+        </code>
+    </div>
+
+    <div class="mt-12 text-center">
+        <p class="text-sm text-gray-500">
+            Powered by <a href="{% url 'home' %}" class="text-indigo-600 hover:underline">Scores</a> - Free leaderboards for indie games
+        </p>
+    </div>
+</div>
+{% endblock %}

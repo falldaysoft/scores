@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}{{ game.name }} Leaderboards{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 py-12">
+    <div class="text-center mb-12">
+        <h1 class="text-4xl font-bold text-gray-900">{{ game.name }}</h1>
+        {% if game.description %}
+        <p class="mt-4 text-lg text-gray-600">{{ game.description }}</p>
+        {% endif %}
+    </div>
+
+    {% if leaderboards %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for leaderboard in leaderboards %}
+        <a href="{% url 'public_leaderboard' game_slug=game.slug leaderboard_slug=leaderboard.slug %}"
+           class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md hover:border-indigo-300 transition-all group">
+            <h2 class="text-xl font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors">{{ leaderboard.name }}</h2>
+            {% if leaderboard.description %}
+            <p class="text-gray-600 mt-2">{{ leaderboard.description }}</p>
+            {% endif %}
+            <div class="mt-4 flex items-center justify-between text-sm">
+                <span class="text-gray-500">{{ leaderboard.scores.count }} scores</span>
+                <span class="text-indigo-600">View leaderboard &rarr;</span>
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 bg-white rounded-xl border border-gray-200">
+        <p class="text-gray-500">No leaderboards available for this game yet.</p>
+    </div>
+    {% endif %}
+
+    <div class="mt-12 text-center">
+        <p class="text-sm text-gray-500">
+            Powered by <a href="{% url 'home' %}" class="text-indigo-600 hover:underline">Scores</a> - Free leaderboards for indie games
+        </p>
+    </div>
+</div>
+{% endblock %}

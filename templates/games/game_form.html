@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title %}{% if game %}Edit {{ game.name }}{% else %}New Game{% endif %}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-8">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <h1 class="text-2xl font-bold text-gray-900 mb-6">{% if game %}Edit Game{% else %}Create New Game{% endif %}</h1>
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+
+            <div>
+                <label for="id_name" class="block text-sm font-medium text-gray-700 mb-1">Game Name</label>
+                {{ form.name }}
+                {% if form.name.errors %}
+                <p class="mt-1 text-sm text-red-600">{{ form.name.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <label for="id_description" class="block text-sm font-medium text-gray-700 mb-1">Description (optional)</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                <p class="mt-1 text-sm text-red-600">{{ form.description.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div class="flex gap-4 pt-4">
+                <button type="submit" class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+                    {% if game %}Save Changes{% else %}Create Game{% endif %}
+                </button>
+                <a href="{% if game %}{% url 'games:game_detail' slug=game.slug %}{% else %}{% url 'games:dashboard' %}{% endif %}" class="bg-gray-100 text-gray-700 px-6 py-2.5 rounded-lg font-medium hover:bg-gray-200 transition-colors">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

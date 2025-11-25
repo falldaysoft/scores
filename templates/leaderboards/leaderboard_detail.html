@@ -1,0 +1,257 @@
+{% extends 'base.html' %}
+{% block title %}{{ leaderboard.name }} - {{ game.name }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Breadcrumb -->
+    <nav class="mb-6">
+        <ol class="flex items-center space-x-2 text-sm">
+            <li><a href="{% url 'games:dashboard' %}" class="text-gray-500 hover:text-gray-700">Dashboard</a></li>
+            <li class="text-gray-400">/</li>
+            <li><a href="{% url 'games:game_detail' slug=game.slug %}" class="text-gray-500 hover:text-gray-700">{{ game.name }}</a></li>
+            <li class="text-gray-400">/</li>
+            <li class="text-gray-900 font-medium">{{ leaderboard.name }}</li>
+        </ol>
+    </nav>
+
+    <!-- Leaderboard Header -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+        <div class="flex justify-between items-start">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900">{{ leaderboard.name }}</h1>
+                {% if leaderboard.description %}
+                <p class="text-gray-600 mt-2">{{ leaderboard.description }}</p>
+                {% endif %}
+                <div class="mt-4 flex items-center gap-4 text-sm text-gray-500">
+                    <span class="bg-gray-100 px-2 py-1 rounded">{{ leaderboard.get_sort_order_display }}</span>
+                    <span>Public URL:
+                        <a href="{% url 'public_leaderboard' game_slug=game.slug leaderboard_slug=leaderboard.slug %}" class="text-indigo-600 hover:underline" target="_blank">
+                            scores.fallday.ca/games/{{ game.slug }}/{{ leaderboard.slug }}/
+                        </a>
+                    </span>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <a href="{% url 'leaderboards:leaderboard_edit' game_slug=game.slug leaderboard_slug=leaderboard.slug %}"
+                   class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+                    Edit
+                </a>
+                <form method="post" action="{% url 'leaderboards:leaderboard_delete' game_slug=game.slug leaderboard_slug=leaderboard.slug %}"
+                      onsubmit="return confirm('Delete this leaderboard and all its scores?');">
+                    {% csrf_token %}
+                    <button type="submit" class="bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors">
+                        Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <!-- API Token & Integration -->
+        <div class="space-y-6">
+            <!-- API Token -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">API Token</h2>
+                <div id="api-token-section" class="space-y-3">
+                    {% include 'leaderboards/partials/api_token.html' %}
+                </div>
+            </div>
+
+            <!-- Code Examples -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6" x-data="{ tab: 'javascript' }">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Integration Code</h2>
+
+                <!-- Tab buttons -->
+                <div class="flex gap-2 mb-4 border-b border-gray-200">
+                    <button @click="tab = 'javascript'" :class="tab === 'javascript' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                            class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors">JavaScript</button>
+                    <button @click="tab = 'python'" :class="tab === 'python' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                            class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors">Python</button>
+                    <button @click="tab = 'curl'" :class="tab === 'curl' ? 'border-indigo-500 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'"
+                            class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors">cURL</button>
+                </div>
+
+                <!-- JavaScript -->
+                <div x-show="tab === 'javascript'" class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-700">Submit a Score</span>
+                            <button onclick="copyCode('js-submit')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
+                        </div>
+                        <pre id="js-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>async function submitScore(playerName, score) {
+  const response = await fetch('https://scores.fallday.ca/api/v1/scores/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer {{ leaderboard.api_token }}'
+    },
+    body: JSON.stringify({
+      player_name: playerName,
+      score: score
+    })
+  });
+  return response.json();
+}
+
+// Example usage:
+submitScore('Player1', 42000);</code></pre>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-700">Get Scores</span>
+                            <button onclick="copyCode('js-get')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
+                        </div>
+                        <pre id="js-get" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>async function getScores(limit = 10) {
+  const response = await fetch(
+    `https://scores.fallday.ca/api/v1/scores/?limit=${limit}`,
+    {
+      headers: {
+        'Authorization': 'Bearer {{ leaderboard.api_token }}'
+      }
+    }
+  );
+  return response.json();
+}
+
+// Or use the public endpoint (no auth required):
+// GET https://scores.fallday.ca/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code></pre>
+                    </div>
+                </div>
+
+                <!-- Python -->
+                <div x-show="tab === 'python'" class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-700">Submit a Score</span>
+                            <button onclick="copyCode('py-submit')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
+                        </div>
+                        <pre id="py-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>import requests
+
+def submit_score(player_name, score):
+    response = requests.post(
+        'https://scores.fallday.ca/api/v1/scores/',
+        headers={
+            'Authorization': 'Bearer {{ leaderboard.api_token }}'
+        },
+        json={
+            'player_name': player_name,
+            'score': score
+        }
+    )
+    return response.json()
+
+# Example usage:
+submit_score('Player1', 42000)</code></pre>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-700">Get Scores</span>
+                            <button onclick="copyCode('py-get')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
+                        </div>
+                        <pre id="py-get" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>import requests
+
+def get_scores(limit=10):
+    response = requests.get(
+        f'https://scores.fallday.ca/api/v1/scores/?limit={limit}',
+        headers={
+            'Authorization': 'Bearer {{ leaderboard.api_token }}'
+        }
+    )
+    return response.json()
+
+# Or use the public endpoint (no auth required):
+# GET https://scores.fallday.ca/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code></pre>
+                    </div>
+                </div>
+
+                <!-- cURL -->
+                <div x-show="tab === 'curl'" class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-700">Submit a Score</span>
+                            <button onclick="copyCode('curl-submit')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
+                        </div>
+                        <pre id="curl-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>curl -X POST https://scores.fallday.ca/api/v1/scores/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {{ leaderboard.api_token }}" \
+  -d '{"player_name": "Player1", "score": 42000}'</code></pre>
+                    </div>
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm font-medium text-gray-700">Get Scores</span>
+                            <button onclick="copyCode('curl-get')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
+                        </div>
+                        <pre id="curl-get" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code># With authentication:
+curl https://scores.fallday.ca/api/v1/scores/?limit=10 \
+  -H "Authorization: Bearer {{ leaderboard.api_token }}"
+
+# Public endpoint (no auth required):
+curl https://scores.fallday.ca/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Current Scores -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Current Scores</h2>
+
+            {% if scores %}
+            <div class="overflow-hidden">
+                <table class="min-w-full">
+                    <thead>
+                        <tr class="border-b border-gray-200">
+                            <th class="py-3 text-left text-sm font-medium text-gray-500">#</th>
+                            <th class="py-3 text-left text-sm font-medium text-gray-500">Player</th>
+                            <th class="py-3 text-right text-sm font-medium text-gray-500">Score</th>
+                            <th class="py-3 text-right text-sm font-medium text-gray-500">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for score in scores %}
+                        <tr class="{% if forloop.counter <= 3 %}bg-yellow-50/50{% endif %}">
+                            <td class="py-3 text-sm">
+                                {% if forloop.counter == 1 %}
+                                <span class="text-yellow-600 font-bold">1st</span>
+                                {% elif forloop.counter == 2 %}
+                                <span class="text-gray-400 font-bold">2nd</span>
+                                {% elif forloop.counter == 3 %}
+                                <span class="text-amber-700 font-bold">3rd</span>
+                                {% else %}
+                                <span class="text-gray-500">{{ forloop.counter }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-3 text-sm font-medium text-gray-900">{{ score.player_name }}</td>
+                            <td class="py-3 text-sm text-gray-900 text-right font-mono">{{ score.score|floatformat:0 }}</td>
+                            <td class="py-3 text-sm text-gray-500 text-right">{{ score.created_at|timesince }} ago</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-8 text-gray-500">
+                <p>No scores yet. Use the API to submit your first score!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function copyCode(elementId) {
+    const code = document.getElementById(elementId).textContent;
+    navigator.clipboard.writeText(code).then(() => {
+        alert('Copied to clipboard!');
+    });
+}
+
+function copyToken() {
+    const token = document.getElementById('api-token').textContent;
+    navigator.clipboard.writeText(token).then(() => {
+        alert('Token copied to clipboard!');
+    });
+}
+</script>
+{% endblock %}
