@@ -5,7 +5,7 @@ from .models import Game
 class GameForm(forms.ModelForm):
     class Meta:
         model = Game
-        fields = ['name', 'description']
+        fields = ['name', 'description', 'url']
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
@@ -15,5 +15,9 @@ class GameForm(forms.ModelForm):
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
                 'placeholder': 'Brief description of your game...',
                 'rows': 3
+            }),
+            'url': forms.URLInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+                'placeholder': 'https://example.com/my-game'
             }),
         }

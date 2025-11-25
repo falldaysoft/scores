@@ -20,9 +20,14 @@
                 {% if game.description %}
                 <p class="text-gray-600 mt-2">{{ game.description }}</p>
                 {% endif %}
+                {% if game.url %}
+                <p class="mt-2">
+                    <a href="{{ game.url }}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline">{{ game.url }}</a>
+                </p>
+                {% endif %}
                 <div class="mt-4 flex items-center gap-4 text-sm">
                     <span class="text-gray-500">
-                        Public URL:
+                        Public Leaderboard URL:
                         <a href="{% url 'public_game' game_slug=game.slug %}" class="text-indigo-600 hover:underline" target="_blank">
                             {{ site_url }}/games/{{ game.slug }}/
                         </a>

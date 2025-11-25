@@ -60,15 +60,6 @@
         {% endif %}
     </div>
 
-    <!-- API Info -->
-    <div class="mt-8 bg-gray-50 rounded-xl p-6">
-        <h3 class="font-semibold text-gray-900 mb-3">API Access</h3>
-        <p class="text-sm text-gray-600 mb-3">Get this leaderboard data via our public API:</p>
-        <code class="block bg-white px-4 py-3 rounded-lg text-sm font-mono text-gray-800 border border-gray-200">
-            GET {{ site_url }}/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/
-        </code>
-    </div>
-
     <div class="mt-12 text-center">
         <p class="text-sm text-gray-500">
             Powered by <a href="{% url 'home' %}" class="text-indigo-600 hover:underline">Scores</a> - Free leaderboards for indie games
