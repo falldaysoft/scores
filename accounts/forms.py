@@ -10,12 +10,6 @@ class SignupForm(UserCreationForm):
             'placeholder': 'you@example.com'
         })
     )
-    username = forms.CharField(
-        widget=forms.TextInput(attrs={
-            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
-            'placeholder': 'Username'
-        })
-    )
     password1 = forms.CharField(
         widget=forms.PasswordInput(attrs={
             'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
@@ -31,7 +25,7 @@ class SignupForm(UserCreationForm):
 
     class Meta:
         model = User
-        fields = ['email', 'username', 'password1', 'password2']
+        fields = ['email', 'password1', 'password2']
 
 
 class LoginForm(AuthenticationForm):

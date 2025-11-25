@@ -15,7 +15,7 @@
                     <a href="{% url 'games:dashboard' %}" class="text-white hover:text-indigo-200 px-3 py-2 text-sm font-medium">Dashboard</a>
                     {% else %}
                     <a href="{% url 'accounts:login' %}" class="text-white hover:text-indigo-200 px-3 py-2 text-sm font-medium">Login</a>
-                    <a href="{% url 'accounts:signup' %}" class="bg-white text-indigo-600 hover:bg-indigo-50 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors">Get Started Free</a>
+                    <a href="{% url 'accounts:signup' %}" class="bg-white text-indigo-600 hover:bg-indigo-50 px-5 py-2.5 rounded-lg text-sm font-semibold transition-colors">Get Started</a>
                     {% endif %}
                 </div>
             </div>
@@ -37,7 +37,7 @@
                 </p>
                 <div class="mt-10 flex justify-center gap-4">
                     <a href="{% url 'accounts:signup' %}" class="bg-white text-indigo-600 hover:bg-indigo-50 px-8 py-4 rounded-xl text-lg font-semibold shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5">
-                        Start Free
+                        Sign Up
                     </a>
                     <a href="#how-it-works" class="bg-indigo-700 text-white hover:bg-indigo-600 px-8 py-4 rounded-xl text-lg font-semibold border border-indigo-500 transition-colors">
                         See How It Works

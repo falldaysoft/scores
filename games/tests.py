@@ -8,7 +8,6 @@ class GameModelTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
 
@@ -40,7 +39,6 @@ class DashboardViewTest(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
 
@@ -66,7 +64,6 @@ class GameCreateViewTest(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         self.client.login(username='test@example.com', password='testpass123')
@@ -90,7 +87,6 @@ class GameDetailViewTest(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         self.game = Game.objects.create(owner=self.user, name='Test Game')
@@ -108,7 +104,6 @@ class GameDetailViewTest(TestCase):
     def test_cannot_view_other_users_game(self):
         other_user = User.objects.create_user(
             email='other@example.com',
-            username='otheruser',
             password='testpass123'
         )
         other_game = Game.objects.create(owner=other_user, name='Other Game')
@@ -121,7 +116,6 @@ class GameDeleteViewTest(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         self.game = Game.objects.create(owner=self.user, name='Test Game')

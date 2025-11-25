@@ -11,7 +11,6 @@ class ScoreAPITest(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         self.game = Game.objects.create(owner=self.user, name='Test Game')
@@ -149,7 +148,6 @@ class PublicScoreAPITest(TestCase):
         self.client = APIClient()
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         self.game = Game.objects.create(owner=self.user, name='Test Game')

@@ -8,7 +8,6 @@ class UserModelTest(TestCase):
     def test_create_user(self):
         user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         self.assertEqual(user.email, 'test@example.com')
@@ -17,7 +16,6 @@ class UserModelTest(TestCase):
     def test_generate_verification_token(self):
         user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         token = user.generate_verification_token()
@@ -27,7 +25,6 @@ class UserModelTest(TestCase):
     def test_verify_email(self):
         user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         token = user.generate_verification_token()
@@ -38,7 +35,6 @@ class UserModelTest(TestCase):
     def test_verify_email_wrong_token(self):
         user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         user.generate_verification_token()
@@ -58,7 +54,6 @@ class SignupViewTest(TestCase):
     def test_signup_success(self):
         response = self.client.post(reverse('accounts:signup'), {
             'email': 'newuser@example.com',
-            'username': 'newuser',
             'password1': 'SecurePass123!',
             'password2': 'SecurePass123!',
         })
@@ -70,12 +65,10 @@ class SignupViewTest(TestCase):
     def test_signup_duplicate_email(self):
         User.objects.create_user(
             email='existing@example.com',
-            username='existing',
             password='testpass123'
         )
         response = self.client.post(reverse('accounts:signup'), {
             'email': 'existing@example.com',
-            'username': 'newuser',
             'password1': 'SecurePass123!',
             'password2': 'SecurePass123!',
         })
@@ -88,7 +81,6 @@ class LoginViewTest(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
 
@@ -117,7 +109,6 @@ class EmailVerificationTest(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
 

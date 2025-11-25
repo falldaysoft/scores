@@ -11,7 +11,6 @@ class LeaderboardModelTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         self.game = Game.objects.create(owner=self.user, name='Test Game')
@@ -36,7 +35,6 @@ class ScoreModelTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         self.game = Game.objects.create(owner=self.user, name='Test Game')
@@ -93,7 +91,6 @@ class LeaderboardViewTest(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         self.game = Game.objects.create(owner=self.user, name='Test Game')
@@ -126,7 +123,6 @@ class PublicLeaderboardViewTest(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(
             email='test@example.com',
-            username='testuser',
             password='testpass123'
         )
         self.game = Game.objects.create(owner=self.user, name='Test Game')
