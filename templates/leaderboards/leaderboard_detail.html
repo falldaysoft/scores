@@ -26,7 +26,7 @@
                     <span class="bg-gray-100 px-2 py-1 rounded">{{ leaderboard.get_sort_order_display }}</span>
                     <span>Public URL:
                         <a href="{% url 'public_leaderboard' game_slug=game.slug leaderboard_slug=leaderboard.slug %}" class="text-indigo-600 hover:underline" target="_blank">
-                            scores.fallday.ca/games/{{ game.slug }}/{{ leaderboard.slug }}/
+                            {{ site_url }}/games/{{ game.slug }}/{{ leaderboard.slug }}/
                         </a>
                     </span>
                 </div>
@@ -80,7 +80,7 @@
                             <button onclick="copyCode('js-submit')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
                         </div>
                         <pre id="js-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>async function submitScore(playerName, score) {
-  const response = await fetch('https://scores.fallday.ca/api/v1/scores/', {
+  const response = await fetch('{{ site_url }}/api/v1/scores/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -104,7 +104,7 @@ submitScore('Player1', 42000);</code></pre>
                         </div>
                         <pre id="js-get" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>async function getScores(limit = 10) {
   const response = await fetch(
-    `https://scores.fallday.ca/api/v1/scores/?limit=${limit}`,
+    `{{ site_url }}/api/v1/scores/?limit=${limit}`,
     {
       headers: {
         'Authorization': 'Bearer {{ leaderboard.api_token }}'
@@ -115,7 +115,7 @@ submitScore('Player1', 42000);</code></pre>
 }
 
 // Or use the public endpoint (no auth required):
-// GET https://scores.fallday.ca/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code></pre>
+// GET {{ site_url }}/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code></pre>
                     </div>
                 </div>
 
@@ -130,7 +130,7 @@ submitScore('Player1', 42000);</code></pre>
 
 def submit_score(player_name, score):
     response = requests.post(
-        'https://scores.fallday.ca/api/v1/scores/',
+        '{{ site_url }}/api/v1/scores/',
         headers={
             'Authorization': 'Bearer {{ leaderboard.api_token }}'
         },
@@ -153,7 +153,7 @@ submit_score('Player1', 42000)</code></pre>
 
 def get_scores(limit=10):
     response = requests.get(
-        f'https://scores.fallday.ca/api/v1/scores/?limit={limit}',
+        f'{{ site_url }}/api/v1/scores/?limit={limit}',
         headers={
             'Authorization': 'Bearer {{ leaderboard.api_token }}'
         }
@@ -161,7 +161,7 @@ def get_scores(limit=10):
     return response.json()
 
 # Or use the public endpoint (no auth required):
-# GET https://scores.fallday.ca/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code></pre>
+# GET {{ site_url }}/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code></pre>
                     </div>
                 </div>
 
@@ -172,7 +172,7 @@ def get_scores(limit=10):
                             <span class="text-sm font-medium text-gray-700">Submit a Score</span>
                             <button onclick="copyCode('curl-submit')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
                         </div>
-                        <pre id="curl-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>curl -X POST https://scores.fallday.ca/api/v1/scores/ \
+                        <pre id="curl-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {{ leaderboard.api_token }}" \
   -d '{"player_name": "Player1", "score": 42000}'</code></pre>
@@ -183,11 +183,11 @@ def get_scores(limit=10):
                             <button onclick="copyCode('curl-get')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
                         </div>
                         <pre id="curl-get" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code># With authentication:
-curl https://scores.fallday.ca/api/v1/scores/?limit=10 \
+curl {{ site_url }}/api/v1/scores/?limit=10 \
   -H "Authorization: Bearer {{ leaderboard.api_token }}"
 
 # Public endpoint (no auth required):
-curl https://scores.fallday.ca/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code></pre>
+curl {{ site_url }}/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code></pre>
                     </div>
                 </div>
             </div>

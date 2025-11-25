@@ -24,7 +24,7 @@
                     <span class="text-gray-500">
                         Public URL:
                         <a href="{% url 'public_game' game_slug=game.slug %}" class="text-indigo-600 hover:underline" target="_blank">
-                            scores.fallday.ca/games/{{ game.slug }}/
+                            {{ site_url }}/games/{{ game.slug }}/
                         </a>
                     </span>
                 </div>

@@ -4,6 +4,7 @@ Django settings for scores project.
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,7 +15,14 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key-change-in-pro
 
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,scores.fallday.ca').split(',')
+# Site URL for templates and links (no trailing slash)
+SITE_URL = os.environ.get('SITE_URL', 'http://localhost:8000')
+
+# Parse SITE_URL host and add to ALLOWED_HOSTS
+_site_host = urlparse(SITE_URL).hostname
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+if _site_host and _site_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_site_host)
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -57,6 +65,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'scores.context_processors.site_url',
             ],
         },
     },
@@ -106,7 +115,7 @@ EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() == 'true'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@scores.fallday.ca')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@localhost')
 
 # Login settings
 LOGIN_URL = 'accounts:login'
