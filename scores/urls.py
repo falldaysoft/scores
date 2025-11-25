@@ -5,7 +5,7 @@ from django.views.generic import TemplateView
 from leaderboards.views import PublicGameView, PublicLeaderboardView
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('backroom/', admin.site.urls),
     path('', TemplateView.as_view(template_name='home.html'), name='home'),
     path('accounts/', include('accounts.urls')),
     path('dashboard/', include('games.urls')),
