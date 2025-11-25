@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: scores-service
+spec:
+  selector:
+    app: scores-app
+  ports:
+  - protocol: "TCP"
+    port: 8000
+    targetPort: 8000
+  type: ClusterIP
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scores-app
+spec:
+  selector:
+    matchLabels:
+      app: scores-app
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: scores-app
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
+    spec:
+      containers:
+        - name: scores
+          image: {{ print .Values.image .Values.tag }}
+          imagePullPolicy: Always
+          envFrom:
+          - secretRef:
+              name: postgres-secret
+          - secretRef:
+              name: scores-secret
+          - secretRef:
+              name: email-secret
+          - configMapRef:
+              name: scores-config
+          ports:
+          - containerPort: 8000
+      imagePullSecrets:
+      - name: github-registry

@@ -1,0 +1,25 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: scores-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/from-www-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: 12m
+    cert-manager.io/cluster-issuer: letsencrypt-cluster-issuer
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - {{ .Values.hostname }}
+    secretName: scores-tls-cert-prod
+  rules:
+  - host: {{ .Values.hostname }}
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: scores-service
+            port:
+              number: 8000

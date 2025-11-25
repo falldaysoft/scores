@@ -6,3 +6,4 @@ djangorestframework==3.16.1
 psycopg2-binary==2.9.11
 python-dotenv==1.2.1
 sqlparse==0.5.3
+gunicorn==23.0.0

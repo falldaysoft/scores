@@ -1,0 +1,30 @@
+{{- if .Values.cleanup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: scores-cleanup
+spec:
+  schedule: {{ .Values.cleanup.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: scores-cleanup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: cleanup
+              image: {{ print .Values.image .Values.tag }}
+              imagePullPolicy: Always
+              command: ["python", "manage.py", "cleanup_expired_scores"]
+              envFrom:
+              - secretRef:
+                  name: postgres-secret
+              - secretRef:
+                  name: scores-secret
+              - configMapRef:
+                  name: scores-config
+          imagePullSecrets:
+          - name: github-registry
+{{- end }}
