@@ -1,0 +1,41 @@
+name: Deploy to Kubernetes
+
+on:
+  workflow_call:
+    inputs:
+      image_tag:
+        required: true
+        type: string
+    secrets:
+      LKE_CONTEXT:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up kubeconfig
+      run: |
+        mkdir -p ~/.kube
+        echo "${{ secrets.LKE_CONTEXT }}" | base64 --decode > ~/.kube/config
+        chmod 600 ~/.kube/config
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: 'latest'
+
+    - name: Deploy to Kubernetes
+      run: |
+        echo "Deploying image with tag: ${{ inputs.image_tag }}"
+        helm list --namespace scores
+        helm upgrade --install scores devops/helm/scores \
+        --set tag=${{ inputs.image_tag }} \
+        --set hostname=scores.fallday.com \
+        --namespace scores \
+        --wait \
+        --timeout 5m
