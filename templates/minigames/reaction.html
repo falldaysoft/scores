@@ -1,0 +1,231 @@
+{% extends 'base.html' %}
+
+{% block title %}Reaction Timer{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 min-h-screen py-12">
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-8">
+            <a href="{% url 'minigames:play' %}" class="text-indigo-300 hover:text-white transition">&larr; Back to games</a>
+            <h1 class="text-4xl font-bold text-white mt-4 mb-2">Reaction Timer</h1>
+            <p class="text-indigo-200">Click as fast as you can when the screen turns green!</p>
+        </div>
+
+        <div x-data="reactionGame()" class="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <!-- Game Area -->
+            <div
+                @click="handleClick()"
+                :class="{
+                    'bg-gray-700': state === 'ready',
+                    'bg-red-600': state === 'waiting',
+                    'bg-green-500': state === 'go',
+                    'bg-yellow-500': state === 'too_early',
+                    'bg-blue-600': state === 'finished' || state === 'submitting' || state === 'submitted'
+                }"
+                class="w-full h-64 rounded-xl flex items-center justify-center cursor-pointer transition-colors duration-100 select-none"
+            >
+                <div class="text-center text-white">
+                    <template x-if="state === 'ready'">
+                        <div>
+                            <p class="text-2xl font-bold mb-2">Click to Start</p>
+                            <p class="text-sm opacity-75">When the screen turns green, click as fast as you can!</p>
+                        </div>
+                    </template>
+                    <template x-if="state === 'waiting'">
+                        <p class="text-3xl font-bold">Wait for green...</p>
+                    </template>
+                    <template x-if="state === 'go'">
+                        <p class="text-4xl font-bold">CLICK NOW!</p>
+                    </template>
+                    <template x-if="state === 'too_early'">
+                        <div>
+                            <p class="text-3xl font-bold mb-2">Too early!</p>
+                            <p class="text-sm">Click to try again</p>
+                        </div>
+                    </template>
+                    <template x-if="state === 'finished' || state === 'submitting' || state === 'submitted'">
+                        <div>
+                            <p class="text-xl mb-2">Your reaction time:</p>
+                            <p class="text-5xl font-bold" x-text="score + ' ms'"></p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Score Submission Form -->
+            <div x-show="state === 'finished'" x-cloak class="mt-6">
+                <form @submit.prevent="submitScore()" class="flex flex-col sm:flex-row gap-4">
+                    <input
+                        type="text"
+                        x-model="playerName"
+                        placeholder="Enter your name"
+                        maxlength="50"
+                        required
+                        class="flex-1 px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                    <button
+                        type="submit"
+                        class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition"
+                    >
+                        Submit Score
+                    </button>
+                </form>
+            </div>
+
+            <!-- Submitting State -->
+            <div x-show="state === 'submitting'" x-cloak class="mt-6 text-center text-white">
+                <p>Submitting score...</p>
+            </div>
+
+            <!-- Submitted State -->
+            <div x-show="state === 'submitted'" x-cloak class="mt-6 text-center">
+                <p class="text-green-400 text-xl font-bold mb-4">Score submitted!</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button @click="reset()" class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-lg transition">
+                        Play Again
+                    </button>
+                    <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='reaction-timer' %}" class="px-6 py-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition text-center">
+                        View Leaderboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div x-show="error && state === 'finished'" x-cloak class="mt-6 text-center">
+                <p class="text-red-400 mb-4" x-text="error"></p>
+                <button @click="reset()" class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-lg transition">
+                    Try Again
+                </button>
+            </div>
+        </div>
+
+        <!-- Leaderboard Preview -->
+        <div class="mt-8 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <h2 class="text-xl font-bold text-white mb-4">Top Scores</h2>
+            <div id="leaderboard" x-data="leaderboardPreview('mini-games', 'reaction-timer')" x-init="fetchScores()">
+                <div x-show="loading" class="text-indigo-200">Loading...</div>
+                <div x-show="!loading && scores.length === 0" class="text-indigo-200">No scores yet. Be the first!</div>
+                <ul x-show="!loading && scores.length > 0" class="space-y-2">
+                    <template x-for="(s, i) in scores" :key="i">
+                        <li class="flex justify-between items-center py-2 px-4 rounded-lg" :class="i < 3 ? 'bg-white/10' : ''">
+                            <div class="flex items-center gap-3">
+                                <span class="text-indigo-300 font-mono w-6" x-text="'#' + s.rank"></span>
+                                <span class="text-white" x-text="s.player_name"></span>
+                            </div>
+                            <span class="text-green-400 font-bold" x-text="s.score + ' ms'"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function reactionGame() {
+    return {
+        state: 'ready', // ready, waiting, go, too_early, finished, submitting, submitted
+        score: 0,
+        playerName: '',
+        error: null,
+        startTime: null,
+        timeout: null,
+        apiToken: 'demo_reaction_timer_public_token_v1',
+
+        handleClick() {
+            if (this.state === 'ready' || this.state === 'too_early') {
+                this.start();
+            } else if (this.state === 'waiting') {
+                this.tooEarly();
+            } else if (this.state === 'go') {
+                this.finish();
+            }
+        },
+
+        start() {
+            this.state = 'waiting';
+            this.error = null;
+            const delay = 2000 + Math.random() * 3000; // 2-5 seconds
+            this.timeout = setTimeout(() => {
+                this.state = 'go';
+                this.startTime = performance.now();
+            }, delay);
+        },
+
+        tooEarly() {
+            clearTimeout(this.timeout);
+            this.state = 'too_early';
+        },
+
+        finish() {
+            this.score = Math.round(performance.now() - this.startTime);
+            this.state = 'finished';
+        },
+
+        async submitScore() {
+            if (!this.playerName.trim()) return;
+
+            this.state = 'submitting';
+            this.error = null;
+
+            try {
+                const response = await fetch('/api/v1/scores/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + this.apiToken
+                    },
+                    body: JSON.stringify({
+                        player_name: this.playerName.trim(),
+                        score: this.score
+                    })
+                });
+
+                if (response.ok) {
+                    this.state = 'submitted';
+                    // Refresh leaderboard
+                    const leaderboardEl = document.querySelector('#leaderboard');
+                    if (leaderboardEl && leaderboardEl._x_dataStack) {
+                        leaderboardEl._x_dataStack[0].fetchScores();
+                    }
+                } else {
+                    const data = await response.json();
+                    this.error = data.error || 'Failed to submit score';
+                    this.state = 'finished';
+                }
+            } catch (e) {
+                this.error = 'Network error. Please try again.';
+                this.state = 'finished';
+            }
+        },
+
+        reset() {
+            this.state = 'ready';
+            this.score = 0;
+            this.error = null;
+        }
+    };
+}
+
+function leaderboardPreview(gameSlug, leaderboardSlug) {
+    return {
+        scores: [],
+        loading: true,
+
+        async fetchScores() {
+            this.loading = true;
+            try {
+                const response = await fetch(`/api/v1/scores/${gameSlug}/${leaderboardSlug}/?limit=10`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.scores = data.scores;
+                }
+            } catch (e) {
+                console.error('Failed to fetch scores:', e);
+            }
+            this.loading = false;
+        }
+    };
+}
+</script>
+{% endblock %}

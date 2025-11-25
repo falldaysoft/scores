@@ -32,9 +32,22 @@ pip install -r requirements.txt
 # Run migrations
 python manage.py migrate
 
+# Set up demo mini-games (optional)
+python manage.py setup_demo_games
+
 # Start development server
 python manage.py runserver
 ```
+
+## Demo Mini-Games
+
+The site includes three playable mini-games at `/play/` that demonstrate the leaderboard functionality:
+
+- **Reaction Timer** - Click when the screen turns green
+- **Memory Sequence** - Remember and repeat color patterns
+- **Target Shooting** - Click targets within 10 seconds
+
+Run `python manage.py setup_demo_games` to create the system user and demo leaderboards. This command is idempotent and can be run multiple times safely.
 
 ## API Usage
 

@@ -1,0 +1,21 @@
+from django.views.generic import TemplateView
+
+
+class PlayPageView(TemplateView):
+    """Main /play page showing all three mini-games"""
+    template_name = 'minigames/play.html'
+
+
+class ReactionGameView(TemplateView):
+    """Standalone page for Reaction Timer game"""
+    template_name = 'minigames/reaction.html'
+
+
+class MemoryGameView(TemplateView):
+    """Standalone page for Memory Sequence game"""
+    template_name = 'minigames/memory.html'
+
+
+class TargetGameView(TemplateView):
+    """Standalone page for Target Shooting game"""
+    template_name = 'minigames/target.html'

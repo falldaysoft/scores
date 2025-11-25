@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'games',
     'leaderboards',
     'api',
+    'minigames',
 ]
 
 MIDDLEWARE = [
