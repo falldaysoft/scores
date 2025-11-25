@@ -44,16 +44,19 @@
             {% if game.description %}
             <p class="text-gray-600 mt-2 line-clamp-2">{{ game.description }}</p>
             {% endif %}
-            {% if game.url %}
-            <p class="mt-2 text-sm text-indigo-600 hover:underline truncate" onclick="event.stopPropagation();">
-                <a href="{{ game.url }}" target="_blank" rel="noopener noreferrer">{{ game.url }}</a>
-            </p>
-            {% endif %}
-            <div class="mt-4 flex items-center text-sm text-gray-500">
-                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                </svg>
-                {{ game.leaderboards.count }} leaderboard{{ game.leaderboards.count|pluralize }}
+            <div class="mt-4 flex items-center gap-4 text-sm text-gray-500">
+                <span class="flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    {{ game.leaderboards.count }} leaderboard{{ game.leaderboards.count|pluralize }}
+                </span>
+                <span class="flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                    {{ game.total_scores }} score{{ game.total_scores|pluralize }} submitted
+                </span>
             </div>
         </a>
         {% endfor %}

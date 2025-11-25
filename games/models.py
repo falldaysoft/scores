@@ -9,6 +9,7 @@ class Game(models.Model):
     slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
     url = models.URLField(max_length=200, blank=True)
+    total_scores = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

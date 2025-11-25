@@ -1,6 +1,7 @@
 import secrets
 from django.conf import settings
 from django.db import models
+from django.db.models import F
 from django.utils import timezone
 from django.utils.text import slugify
 from datetime import timedelta
@@ -60,9 +61,15 @@ class Score(models.Model):
         return f"{self.player_name}: {self.score}"
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
         if not self.expires_at:
             self.expires_at = timezone.now() + timedelta(days=settings.SCORE_EXPIRATION_DAYS)
         super().save(*args, **kwargs)
+        if is_new:
+            from games.models import Game
+            Game.objects.filter(pk=self.leaderboard.game_id).update(
+                total_scores=F('total_scores') + 1
+            )
 
     @classmethod
     def cleanup_expired(cls):

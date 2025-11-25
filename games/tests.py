@@ -1,6 +1,9 @@
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.utils import timezone
+from datetime import timedelta
 from accounts.models import User
+from leaderboards.models import Leaderboard, Score
 from .models import Game
 
 
@@ -125,3 +128,65 @@ class GameDeleteViewTest(TestCase):
         response = self.client.post(reverse('games:game_delete', kwargs={'slug': self.game.slug}))
         self.assertRedirects(response, reverse('games:dashboard'))
         self.assertFalse(Game.objects.filter(pk=self.game.pk).exists())
+
+
+class GameTotalScoresTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.game = Game.objects.create(owner=self.user, name='Test Game')
+        self.leaderboard = Leaderboard.objects.create(
+            game=self.game,
+            name='High Scores'
+        )
+
+    def test_total_scores_starts_at_zero(self):
+        self.assertEqual(self.game.total_scores, 0)
+
+    def test_total_scores_increments_on_score_create(self):
+        Score.objects.create(
+            leaderboard=self.leaderboard,
+            player_name='Player1',
+            score=100
+        )
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.total_scores, 1)
+
+        Score.objects.create(
+            leaderboard=self.leaderboard,
+            player_name='Player2',
+            score=200
+        )
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.total_scores, 2)
+
+    def test_total_scores_does_not_decrement_on_delete(self):
+        score = Score.objects.create(
+            leaderboard=self.leaderboard,
+            player_name='Player1',
+            score=100
+        )
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.total_scores, 1)
+
+        score.delete()
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.total_scores, 1)
+
+    def test_total_scores_does_not_decrement_on_cleanup(self):
+        # Create an expired score
+        Score.objects.create(
+            leaderboard=self.leaderboard,
+            player_name='Player1',
+            score=100,
+            expires_at=timezone.now() - timedelta(days=1)
+        )
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.total_scores, 1)
+
+        # Cleanup expired scores
+        Score.cleanup_expired()
+        self.game.refresh_from_db()
+        self.assertEqual(self.game.total_scores, 1)
