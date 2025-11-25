@@ -3,10 +3,6 @@ hostname: not-set
 
 image: "ghcr.io/falldaysoft/scores/scores:"
 
-smtp:
-  user: not-set
-  password: not-set
-
 # Database migration job (runs as Helm hook)
 migrations:
   enabled: true
