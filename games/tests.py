@@ -124,10 +124,63 @@ class GameDeleteViewTest(TestCase):
         self.game = Game.objects.create(owner=self.user, name='Test Game')
         self.client.login(username='test@example.com', password='testpass123')
 
-    def test_delete_game(self):
-        response = self.client.post(reverse('games:game_delete', kwargs={'slug': self.game.slug}))
+    def test_delete_confirmation_page_loads(self):
+        response = self.client.get(reverse('games:game_delete', kwargs={'slug': self.game.slug}))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Delete Game')
+        self.assertContains(response, self.game.name)
+
+    def test_delete_game_with_correct_confirmation(self):
+        response = self.client.post(
+            reverse('games:game_delete', kwargs={'slug': self.game.slug}),
+            {'confirmation': 'Test Game'}
+        )
         self.assertRedirects(response, reverse('games:dashboard'))
         self.assertFalse(Game.objects.filter(pk=self.game.pk).exists())
+
+    def test_delete_game_with_wrong_confirmation(self):
+        response = self.client.post(
+            reverse('games:game_delete', kwargs={'slug': self.game.slug}),
+            {'confirmation': 'Wrong Name'}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Game.objects.filter(pk=self.game.pk).exists())
+        self.assertContains(response, 'Please type')
+
+    def test_delete_game_with_empty_confirmation(self):
+        response = self.client.post(
+            reverse('games:game_delete', kwargs={'slug': self.game.slug}),
+            {'confirmation': ''}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(Game.objects.filter(pk=self.game.pk).exists())
+
+    def test_cannot_delete_other_users_game(self):
+        other_user = User.objects.create_user(
+            email='other@example.com',
+            password='testpass123'
+        )
+        other_game = Game.objects.create(owner=other_user, name='Other Game')
+        response = self.client.post(
+            reverse('games:game_delete', kwargs={'slug': other_game.slug}),
+            {'confirmation': 'Other Game'}
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Game.objects.filter(pk=other_game.pk).exists())
+
+    def test_delete_game_cascades_to_leaderboards_and_scores(self):
+        leaderboard = Leaderboard.objects.create(game=self.game, name='High Scores')
+        Score.objects.create(leaderboard=leaderboard, player_name='Player1', score=100)
+        Score.objects.create(leaderboard=leaderboard, player_name='Player2', score=200)
+
+        response = self.client.post(
+            reverse('games:game_delete', kwargs={'slug': self.game.slug}),
+            {'confirmation': 'Test Game'}
+        )
+        self.assertRedirects(response, reverse('games:dashboard'))
+        self.assertFalse(Game.objects.filter(pk=self.game.pk).exists())
+        self.assertFalse(Leaderboard.objects.filter(pk=leaderboard.pk).exists())
+        self.assertEqual(Score.objects.count(), 0)
 
 
 class GameTotalScoresTest(TestCase):

@@ -44,12 +44,9 @@
                 <a href="{% url 'games:game_edit' slug=game.slug %}" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
                     Edit
                 </a>
-                <form method="post" action="{% url 'games:game_delete' slug=game.slug %}" onsubmit="return confirm('Are you sure you want to delete this game and all its leaderboards?');">
-                    {% csrf_token %}
-                    <button type="submit" class="bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors">
-                        Delete
-                    </button>
-                </form>
+                <a href="{% url 'games:game_delete' slug=game.slug %}" class="bg-red-50 text-red-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors">
+                    Delete
+                </a>
             </div>
         </div>
     </div>

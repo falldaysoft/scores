@@ -6,7 +6,7 @@ from django.views import View
 from django.http import HttpResponse
 
 from .models import Game
-from .forms import GameForm
+from .forms import GameForm, GameDeleteConfirmForm
 from leaderboards.models import Leaderboard
 from leaderboards.forms import LeaderboardForm
 
@@ -74,11 +74,33 @@ class GameEditView(LoginRequiredMixin, View):
 
 
 class GameDeleteView(LoginRequiredMixin, View):
+    def get(self, request, slug):
+        game = get_object_or_404(Game, slug=slug, owner=request.user)
+        form = GameDeleteConfirmForm(game_name=game.name)
+        leaderboard_count = game.leaderboards.count()
+        score_count = sum(lb.scores.count() for lb in game.leaderboards.all())
+        return render(request, 'games/game_delete_confirm.html', {
+            'game': game,
+            'form': form,
+            'leaderboard_count': leaderboard_count,
+            'score_count': score_count,
+        })
+
     def post(self, request, slug):
         game = get_object_or_404(Game, slug=slug, owner=request.user)
-        name = game.name
-        game.delete()
-        messages.success(request, f'Game "{name}" deleted.')
-        if request.htmx:
-            return HttpResponse(status=204, headers={'HX-Redirect': '/dashboard/'})
-        return redirect('games:dashboard')
+        form = GameDeleteConfirmForm(request.POST, game_name=game.name)
+        if form.is_valid():
+            name = game.name
+            game.delete()
+            messages.success(request, f'Game "{name}" and all associated data deleted.')
+            if request.htmx:
+                return HttpResponse(status=204, headers={'HX-Redirect': '/dashboard/'})
+            return redirect('games:dashboard')
+        leaderboard_count = game.leaderboards.count()
+        score_count = sum(lb.scores.count() for lb in game.leaderboards.all())
+        return render(request, 'games/game_delete_confirm.html', {
+            'game': game,
+            'form': form,
+            'leaderboard_count': leaderboard_count,
+            'score_count': score_count,
+        })
