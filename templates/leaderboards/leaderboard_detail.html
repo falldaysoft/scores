@@ -16,14 +16,16 @@
 
     <!-- Leaderboard Header -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-        <div class="flex justify-between items-start">
+        <div class="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4">
             <div>
-                <h1 class="text-3xl font-bold text-gray-900">{{ leaderboard.name }}</h1>
+                <div class="flex items-center gap-3">
+                    <h1 class="text-3xl font-bold text-gray-900">{{ leaderboard.name }}</h1>
+                    <span class="bg-gray-100 px-2 py-1 rounded text-sm text-gray-500">{{ leaderboard.get_sort_order_display }}</span>
+                </div>
                 {% if leaderboard.description %}
                 <p class="text-gray-600 mt-2">{{ leaderboard.description }}</p>
                 {% endif %}
-                <div class="mt-4 flex items-center gap-4 text-sm text-gray-500">
-                    <span class="bg-gray-100 px-2 py-1 rounded">{{ leaderboard.get_sort_order_display }}</span>
+                <div class="mt-4 text-sm text-gray-500">
                     <span>Public Leaderboard URL:
                         <a href="{% url 'public_leaderboard' game_slug=game.slug leaderboard_slug=leaderboard.slug %}" class="text-indigo-600 hover:underline" target="_blank">
                             {{ site_url }}/games/{{ game.slug }}/{{ leaderboard.slug }}/
@@ -31,11 +33,18 @@
                     </span>
                 </div>
             </div>
-            <div class="flex gap-2">
+            <div class="flex flex-wrap gap-2 shrink-0">
                 <a href="{% url 'leaderboards:leaderboard_edit' game_slug=game.slug leaderboard_slug=leaderboard.slug %}"
                    class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
                     Edit
                 </a>
+                <form method="post" action="{% url 'leaderboards:leaderboard_reset_scores' game_slug=game.slug leaderboard_slug=leaderboard.slug %}"
+                      onsubmit="return confirm('Reset all scores for this leaderboard? This cannot be undone.');">
+                    {% csrf_token %}
+                    <button type="submit" class="bg-orange-50 text-orange-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-orange-100 transition-colors whitespace-nowrap">
+                        Reset Scores
+                    </button>
+                </form>
                 <form method="post" action="{% url 'leaderboards:leaderboard_delete' game_slug=game.slug leaderboard_slug=leaderboard.slug %}"
                       onsubmit="return confirm('Delete this leaderboard and all its scores?');">
                     {% csrf_token %}

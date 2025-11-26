@@ -86,6 +86,19 @@ class LeaderboardDeleteView(LoginRequiredMixin, View):
         return redirect('games:game_detail', slug=game.slug)
 
 
+class LeaderboardResetScoresView(LoginRequiredMixin, View):
+    def post(self, request, game_slug, leaderboard_slug):
+        game = get_object_or_404(Game, slug=game_slug, owner=request.user)
+        leaderboard = get_object_or_404(Leaderboard, slug=leaderboard_slug, game=game)
+        deleted_count, _ = leaderboard.scores.all().delete()
+        messages.success(request, f'Deleted {deleted_count} score(s) from "{leaderboard.name}".')
+        if request.htmx:
+            return HttpResponse(status=204, headers={
+                'HX-Redirect': f'/dashboard/games/{game.slug}/leaderboards/{leaderboard.slug}/'
+            })
+        return redirect('leaderboards:leaderboard_detail', game_slug=game.slug, leaderboard_slug=leaderboard.slug)
+
+
 class RegenerateTokenView(LoginRequiredMixin, View):
     def post(self, request, game_slug, leaderboard_slug):
         game = get_object_or_404(Game, slug=game_slug, owner=request.user)

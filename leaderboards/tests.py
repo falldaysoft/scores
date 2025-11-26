@@ -117,6 +117,43 @@ class LeaderboardViewTest(TestCase):
         self.assertContains(response, 'Player1')
         self.assertContains(response, 'Player2')
 
+    def test_reset_scores_deletes_all_scores(self):
+        Score.objects.create(leaderboard=self.leaderboard, player_name='Player1', score=1000)
+        Score.objects.create(leaderboard=self.leaderboard, player_name='Player2', score=2000)
+        self.assertEqual(Score.objects.filter(leaderboard=self.leaderboard).count(), 2)
+
+        response = self.client.post(reverse('leaderboards:leaderboard_reset_scores', kwargs={
+            'game_slug': self.game.slug,
+            'leaderboard_slug': self.leaderboard.slug
+        }))
+        self.assertRedirects(response, reverse('leaderboards:leaderboard_detail', kwargs={
+            'game_slug': self.game.slug,
+            'leaderboard_slug': self.leaderboard.slug
+        }))
+        self.assertEqual(Score.objects.filter(leaderboard=self.leaderboard).count(), 0)
+
+    def test_reset_scores_requires_auth(self):
+        self.client.logout()
+        response = self.client.post(reverse('leaderboards:leaderboard_reset_scores', kwargs={
+            'game_slug': self.game.slug,
+            'leaderboard_slug': self.leaderboard.slug
+        }))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/accounts/login/', response.url)
+
+    def test_reset_scores_requires_ownership(self):
+        other_user = User.objects.create_user(email='other@example.com', password='testpass123')
+        self.client.login(username='other@example.com', password='testpass123')
+
+        Score.objects.create(leaderboard=self.leaderboard, player_name='Player1', score=1000)
+
+        response = self.client.post(reverse('leaderboards:leaderboard_reset_scores', kwargs={
+            'game_slug': self.game.slug,
+            'leaderboard_slug': self.leaderboard.slug
+        }))
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(Score.objects.filter(leaderboard=self.leaderboard).count(), 1)
+
 
 class PublicLeaderboardViewTest(TestCase):
     def setUp(self):

@@ -9,6 +9,7 @@ urlpatterns = [
     path('games/<slug:game_slug>/leaderboards/<slug:leaderboard_slug>/', views.LeaderboardDetailView.as_view(), name='leaderboard_detail'),
     path('games/<slug:game_slug>/leaderboards/<slug:leaderboard_slug>/edit/', views.LeaderboardEditView.as_view(), name='leaderboard_edit'),
     path('games/<slug:game_slug>/leaderboards/<slug:leaderboard_slug>/delete/', views.LeaderboardDeleteView.as_view(), name='leaderboard_delete'),
+    path('games/<slug:game_slug>/leaderboards/<slug:leaderboard_slug>/reset-scores/', views.LeaderboardResetScoresView.as_view(), name='leaderboard_reset_scores'),
     path('games/<slug:game_slug>/leaderboards/<slug:leaderboard_slug>/regenerate-token/', views.RegenerateTokenView.as_view(), name='regenerate_token'),
 ]
 
