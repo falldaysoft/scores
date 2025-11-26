@@ -7,7 +7,8 @@ from django.conf import settings
 from django.urls import reverse
 from django.views import View
 
-from .forms import SignupForm, LoginForm
+from django.contrib.auth.mixins import LoginRequiredMixin
+from .forms import SignupForm, LoginForm, AccountSettingsForm
 from .models import User
 
 
@@ -79,3 +80,17 @@ class ResendVerificationView(View):
             SignupView().send_verification_email(request, request.user, token)
             messages.success(request, 'Verification email sent!')
         return redirect('games:dashboard')
+
+
+class AccountSettingsView(LoginRequiredMixin, View):
+    def get(self, request):
+        form = AccountSettingsForm(instance=request.user)
+        return render(request, 'accounts/settings.html', {'form': form})
+
+    def post(self, request):
+        form = AccountSettingsForm(request.POST, instance=request.user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Account settings updated.')
+            return redirect('accounts:settings')
+        return render(request, 'accounts/settings.html', {'form': form})

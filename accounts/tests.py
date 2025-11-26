@@ -54,11 +54,13 @@ class SignupViewTest(TestCase):
     def test_signup_success(self):
         response = self.client.post(reverse('accounts:signup'), {
             'email': 'newuser@example.com',
+            'account_name': 'NewStudio',
             'password1': 'SecurePass123!',
             'password2': 'SecurePass123!',
         })
         self.assertRedirects(response, reverse('games:dashboard'))
-        self.assertTrue(User.objects.filter(email='newuser@example.com').exists())
+        user = User.objects.get(email='newuser@example.com')
+        self.assertEqual(user.account_name, 'NewStudio')
         self.assertEqual(len(mail.outbox), 1)
         self.assertIn('Verify', mail.outbox[0].subject)
 
@@ -69,11 +71,37 @@ class SignupViewTest(TestCase):
         )
         response = self.client.post(reverse('accounts:signup'), {
             'email': 'existing@example.com',
+            'account_name': 'SomeStudio',
             'password1': 'SecurePass123!',
             'password2': 'SecurePass123!',
         })
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'already exists')
+
+    def test_signup_duplicate_account_name(self):
+        User.objects.create_user(
+            email='existing@example.com',
+            password='testpass123',
+            account_name='TakenStudio'
+        )
+        response = self.client.post(reverse('accounts:signup'), {
+            'email': 'newuser@example.com',
+            'account_name': 'TakenStudio',
+            'password1': 'SecurePass123!',
+            'password2': 'SecurePass123!',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'already taken')
+
+    def test_signup_account_name_required(self):
+        response = self.client.post(reverse('accounts:signup'), {
+            'email': 'newuser@example.com',
+            'account_name': '',
+            'password1': 'SecurePass123!',
+            'password2': 'SecurePass123!',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(User.objects.filter(email='newuser@example.com').exists())
 
 
 class LoginViewTest(TestCase):
@@ -124,3 +152,99 @@ class EmailVerificationTest(TestCase):
         self.assertRedirects(response, reverse('accounts:login'))
         self.user.refresh_from_db()
         self.assertFalse(self.user.email_verified)
+
+
+class AccountNameTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email='test@example.com',
+            password='testpass123'
+        )
+
+    def test_account_name_initially_null(self):
+        self.assertIsNone(self.user.account_name)
+
+    def test_set_account_name(self):
+        self.user.account_name = 'MyStudio'
+        self.user.save()
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.account_name, 'MyStudio')
+
+    def test_account_name_unique(self):
+        self.user.account_name = 'UniqueStudio'
+        self.user.save()
+        user2 = User.objects.create_user(
+            email='test2@example.com',
+            password='testpass123'
+        )
+        from django.db import IntegrityError
+        user2.account_name = 'UniqueStudio'
+        with self.assertRaises(IntegrityError):
+            user2.save()
+
+
+class AccountSettingsViewTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email='test@example.com',
+            password='testpass123'
+        )
+
+    def test_settings_page_requires_login(self):
+        response = self.client.get(reverse('accounts:settings'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('login', response.url)
+
+    def test_settings_page_loads(self):
+        self.client.login(username='test@example.com', password='testpass123')
+        response = self.client.get(reverse('accounts:settings'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Account Settings')
+
+    def test_update_account_name(self):
+        self.client.login(username='test@example.com', password='testpass123')
+        response = self.client.post(reverse('accounts:settings'), {
+            'account_name': 'NewStudio'
+        })
+        self.assertRedirects(response, reverse('accounts:settings'))
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.account_name, 'NewStudio')
+
+    def test_update_account_name_duplicate(self):
+        User.objects.create_user(
+            email='other@example.com',
+            password='testpass123',
+            account_name='TakenName'
+        )
+        self.client.login(username='test@example.com', password='testpass123')
+        response = self.client.post(reverse('accounts:settings'), {
+            'account_name': 'TakenName'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'already taken')
+
+    def test_update_account_name_case_insensitive_duplicate(self):
+        User.objects.create_user(
+            email='other@example.com',
+            password='testpass123',
+            account_name='TakenName'
+        )
+        self.client.login(username='test@example.com', password='testpass123')
+        response = self.client.post(reverse('accounts:settings'), {
+            'account_name': 'takenname'
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'already taken')
+
+    def test_clear_account_name(self):
+        self.user.account_name = 'OldName'
+        self.user.save()
+        self.client.login(username='test@example.com', password='testpass123')
+        response = self.client.post(reverse('accounts:settings'), {
+            'account_name': ''
+        })
+        self.assertRedirects(response, reverse('accounts:settings'))
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.account_name)
