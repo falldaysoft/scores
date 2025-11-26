@@ -74,11 +74,16 @@ class GameEditView(LoginRequiredMixin, View):
 
 
 class GameDeleteView(LoginRequiredMixin, View):
+    def _get_game_stats(self, game):
+        """Calculate leaderboard and score counts for a game."""
+        leaderboard_count = game.leaderboards.count()
+        score_count = sum(lb.scores.count() for lb in game.leaderboards.all())
+        return leaderboard_count, score_count
+
     def get(self, request, slug):
         game = get_object_or_404(Game, slug=slug, owner=request.user)
         form = GameDeleteConfirmForm(game_name=game.name)
-        leaderboard_count = game.leaderboards.count()
-        score_count = sum(lb.scores.count() for lb in game.leaderboards.all())
+        leaderboard_count, score_count = self._get_game_stats(game)
         return render(request, 'games/game_delete_confirm.html', {
             'game': game,
             'form': form,
@@ -96,8 +101,7 @@ class GameDeleteView(LoginRequiredMixin, View):
             if request.htmx:
                 return HttpResponse(status=204, headers={'HX-Redirect': '/dashboard/'})
             return redirect('games:dashboard')
-        leaderboard_count = game.leaderboards.count()
-        score_count = sum(lb.scores.count() for lb in game.leaderboards.all())
+        leaderboard_count, score_count = self._get_game_stats(game)
         return render(request, 'games/game_delete_confirm.html', {
             'game': game,
             'form': form,
