@@ -13,6 +13,9 @@
         <p class="mt-2 text-sm text-gray-500">
             {{ leaderboard.get_sort_order_display }} &bull; Scores expire after 7 days
         </p>
+        {% if game.url %}
+        <a href="{{ game.url }}" class="inline-block mt-4 text-indigo-600 hover:underline text-sm">Back to Game</a>
+        {% endif %}
     </div>
 
     <!-- Leaderboard -->
