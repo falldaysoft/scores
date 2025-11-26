@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block title %}Delete {{ game.name }}{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Breadcrumb -->
+    <nav class="mb-6">
+        <ol class="flex items-center space-x-2 text-sm">
+            <li><a href="{% url 'games:dashboard' %}" class="text-gray-500 hover:text-gray-700">Dashboard</a></li>
+            <li class="text-gray-400">/</li>
+            <li><a href="{% url 'games:game_detail' slug=game.slug %}" class="text-gray-500 hover:text-gray-700">{{ game.name }}</a></li>
+            <li class="text-gray-400">/</li>
+            <li class="text-gray-900 font-medium">Delete</li>
+        </ol>
+    </nav>
+
+    <div class="bg-white rounded-xl shadow-sm border border-red-200 p-6">
+        <div class="flex items-center mb-6">
+            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mr-4">
+                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Delete Game</h1>
+                <p class="text-gray-600">This action cannot be undone</p>
+            </div>
+        </div>
+
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+            <p class="text-red-800 font-medium mb-2">You are about to permanently delete:</p>
+            <ul class="text-red-700 text-sm space-y-1 ml-4">
+                <li>Game: <strong>{{ game.name }}</strong></li>
+                <li>{{ leaderboard_count }} leaderboard{{ leaderboard_count|pluralize }}</li>
+                <li>{{ score_count }} score{{ score_count|pluralize }}</li>
+            </ul>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="mb-6">
+                <label for="id_confirmation" class="block text-sm font-medium text-gray-700 mb-2">
+                    To confirm, type <strong class="text-red-600">{{ game.name }}</strong> below:
+                </label>
+                {{ form.confirmation }}
+                {% if form.confirmation.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ form.confirmation.errors.0 }}</p>
+                {% endif %}
+            </div>
+
+            <div class="flex gap-3 justify-end">
+                <a href="{% url 'games:game_detail' slug=game.slug %}" class="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                    Cancel
+                </a>
+                <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">
+                    Delete Game
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
