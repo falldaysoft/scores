@@ -19,7 +19,7 @@ spec:
         - name: migrate
           image: {{ print .Values.image .Values.tag }}
           imagePullPolicy: Always
-          command: ["python", "manage.py", "migrate", "--noinput"]
+          command: ["/bin/sh", "-c", "python manage.py migrate --noinput && python manage.py setup_demo_games"]
           envFrom:
           - secretRef:
               name: postgres-secret

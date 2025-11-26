@@ -8,4 +8,5 @@ urlpatterns = [
     path('reaction/', views.ReactionGameView.as_view(), name='reaction'),
     path('memory/', views.MemoryGameView.as_view(), name='memory'),
     path('target/', views.TargetGameView.as_view(), name='target'),
+    path('whack/', views.WhackGameView.as_view(), name='whack'),
 ]

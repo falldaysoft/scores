@@ -10,6 +10,7 @@ DEMO_API_TOKENS = {
     'reaction-timer': 'demo_reaction_timer_public_token_v1',
     'memory-sequence': 'demo_memory_sequence_public_token_v1',
     'target-shooting': 'demo_target_shooting_public_token_v1',
+    'whack-a-mole': 'demo_whack_a_mole_public_token_v1',
 }
 
 
@@ -37,6 +38,12 @@ class Command(BaseCommand):
             'name': 'Target Shooting',
             'slug': 'target-shooting',
             'description': 'Click targets as fast as you can in 10 seconds. Smaller targets = more points!',
+            'sort_order': 'desc',  # Higher score = better
+        },
+        {
+            'name': 'Whack-a-Mole',
+            'slug': 'whack-a-mole',
+            'description': 'Whack moles as they pop up! Faster hits = more points.',
             'sort_order': 'desc',  # Higher score = better
         },
     ]

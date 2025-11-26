@@ -1,0 +1,348 @@
+{% extends 'base.html' %}
+
+{% block title %}Whack-a-Mole{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 min-h-screen py-12">
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-8">
+            <a href="{% url 'minigames:play' %}" class="text-indigo-300 hover:text-white transition">&larr; Back to games</a>
+            <h1 class="text-4xl font-bold text-white mt-4 mb-2">Whack-a-Mole</h1>
+            <p class="text-indigo-200">Whack the moles as fast as you can! Faster hits = higher score!</p>
+        </div>
+
+        <div x-data="whackGame()" class="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <!-- Game Stats -->
+            <div class="flex justify-between items-center mb-4 text-white">
+                <div class="text-xl font-bold">Score: <span x-text="score" class="text-green-400"></span></div>
+                <div class="text-xl font-bold">Time: <span x-text="timeLeft" class="text-yellow-400"></span>s</div>
+                <div class="text-xl font-bold">Moles: <span x-text="molesWhacked" class="text-orange-400"></span>/<span x-text="totalMoles"></span></div>
+            </div>
+
+            <!-- Game Area -->
+            <div class="relative">
+                <!-- Start/Game Over Overlay -->
+                <div
+                    x-show="state === 'ready' || state === 'finished' || state === 'submitting' || state === 'submitted'"
+                    class="absolute inset-0 bg-black/70 rounded-xl flex items-center justify-center z-10"
+                >
+                    <div class="text-center text-white">
+                        <template x-if="state === 'ready'">
+                            <div>
+                                <p class="text-2xl font-bold mb-4">Click to Start!</p>
+                                <p class="text-sm opacity-75 mb-4">Whack 10 moles as fast as you can!</p>
+                                <button @click="start()" class="px-8 py-4 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition text-xl">
+                                    Start Game
+                                </button>
+                            </div>
+                        </template>
+                        <template x-if="state === 'finished' || state === 'submitting' || state === 'submitted'">
+                            <div>
+                                <p class="text-xl mb-2">Your Score:</p>
+                                <p class="text-5xl font-bold text-green-400" x-text="score"></p>
+                                <p class="text-sm text-indigo-300 mt-2">Whacked <span x-text="molesWhacked"></span> moles in <span x-text="((gameDuration - timeLeft * 1000) / 1000).toFixed(1)"></span>s</p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Mole Grid -->
+                <div class="grid grid-cols-3 gap-4 p-4 bg-gradient-to-b from-green-800 to-green-900 rounded-xl min-h-[400px]">
+                    <template x-for="(hole, index) in holes" :key="index">
+                        <div
+                            @click="whack(index)"
+                            class="relative bg-gradient-to-b from-amber-900 to-amber-950 rounded-full aspect-square cursor-pointer overflow-hidden border-4 border-amber-800"
+                            :class="{ 'ring-4 ring-yellow-400': hole.active }"
+                        >
+                            <!-- Hole -->
+                            <div class="absolute inset-2 bg-black/60 rounded-full"></div>
+                            <!-- Mole -->
+                            <div
+                                x-show="hole.active"
+                                x-transition:enter="transition ease-out duration-100"
+                                x-transition:enter-start="translate-y-full"
+                                x-transition:enter-end="translate-y-0"
+                                x-transition:leave="transition ease-in duration-75"
+                                x-transition:leave-start="translate-y-0"
+                                x-transition:leave-end="translate-y-full"
+                                class="absolute inset-0 flex items-center justify-center"
+                            >
+                                <div class="w-3/4 h-3/4 bg-gradient-to-b from-amber-600 to-amber-800 rounded-full flex items-center justify-center shadow-lg border-2 border-amber-500">
+                                    <!-- Mole face -->
+                                    <div class="relative w-full h-full">
+                                        <!-- Eyes -->
+                                        <div class="absolute top-1/4 left-1/4 w-2 h-2 bg-black rounded-full"></div>
+                                        <div class="absolute top-1/4 right-1/4 w-2 h-2 bg-black rounded-full"></div>
+                                        <!-- Nose -->
+                                        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 w-3 h-2 bg-pink-400 rounded-full"></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Hit effect -->
+                            <div
+                                x-show="hole.hit"
+                                class="absolute inset-0 bg-yellow-400/50 rounded-full animate-ping"
+                            ></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Score Submission Form -->
+            <div x-show="state === 'finished'" x-cloak class="mt-6">
+                <form @submit.prevent="submitScore()" class="flex flex-col sm:flex-row gap-4">
+                    <input
+                        type="text"
+                        x-model="playerName"
+                        placeholder="Enter your name"
+                        maxlength="50"
+                        required
+                        class="flex-1 px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                    <button
+                        type="submit"
+                        class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition"
+                    >
+                        Submit Score
+                    </button>
+                </form>
+            </div>
+
+            <!-- Submitting State -->
+            <div x-show="state === 'submitting'" x-cloak class="mt-6 text-center text-white">
+                <p>Submitting score...</p>
+            </div>
+
+            <!-- Submitted State -->
+            <div x-show="state === 'submitted'" x-cloak class="mt-6 text-center">
+                <p class="text-green-400 text-xl font-bold mb-4">Score submitted!</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button @click="reset()" class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-lg transition">
+                        Play Again
+                    </button>
+                    <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='whack-a-mole' %}" class="px-6 py-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition text-center">
+                        View Leaderboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div x-show="error && state === 'finished'" x-cloak class="mt-6 text-center">
+                <p class="text-red-400 mb-4" x-text="error"></p>
+                <button @click="reset()" class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-lg transition">
+                    Try Again
+                </button>
+            </div>
+        </div>
+
+        <!-- Leaderboard Preview -->
+        <div class="mt-8 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <h2 class="text-xl font-bold text-white mb-4">Top Scores</h2>
+            <div id="leaderboard" x-data="leaderboardPreview('mini-games', 'whack-a-mole')" x-init="fetchScores()">
+                <div x-show="loading" class="text-indigo-200">Loading...</div>
+                <div x-show="!loading && scores.length === 0" class="text-indigo-200">No scores yet. Be the first!</div>
+                <ul x-show="!loading && scores.length > 0" class="space-y-2">
+                    <template x-for="(s, i) in scores" :key="i">
+                        <li class="flex justify-between items-center py-2 px-4 rounded-lg" :class="i < 3 ? 'bg-white/10' : ''">
+                            <div class="flex items-center gap-3">
+                                <span class="text-indigo-300 font-mono w-6" x-text="'#' + s.rank"></span>
+                                <span class="text-white" x-text="s.player_name"></span>
+                            </div>
+                            <span class="text-green-400 font-bold" x-text="s.score + ' pts'"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Leaderboard Link -->
+        <p class="mt-4 text-center text-indigo-300 text-sm">
+            <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='whack-a-mole' %}" class="hover:text-white transition underline">View full leaderboard</a>
+        </p>
+    </div>
+</div>
+
+<script>
+function whackGame() {
+    return {
+        state: 'ready', // ready, playing, finished, submitting, submitted
+        score: 0,
+        timeLeft: 30,
+        molesWhacked: 0,
+        totalMoles: 10,
+        playerName: '',
+        error: null,
+        apiToken: 'demo_whack_a_mole_public_token_v1',
+        gameDuration: 30000,
+        holes: Array(9).fill(null).map(() => ({ active: false, hit: false })),
+        gameInterval: null,
+        timerInterval: null,
+        moleTimeout: null,
+        currentMoleIndex: null,
+        moleAppearTime: null,
+
+        start() {
+            this.state = 'playing';
+            this.score = 0;
+            this.molesWhacked = 0;
+            this.timeLeft = 30;
+            this.error = null;
+            this.holes.forEach(h => { h.active = false; h.hit = false; });
+
+            // Start timer countdown
+            this.timerInterval = setInterval(() => {
+                this.timeLeft--;
+                if (this.timeLeft <= 0) {
+                    this.endGame();
+                }
+            }, 1000);
+
+            // Show first mole
+            this.showMole();
+        },
+
+        showMole() {
+            if (this.state !== 'playing') return;
+            if (this.molesWhacked >= this.totalMoles) {
+                this.endGame();
+                return;
+            }
+
+            // Hide any active mole
+            this.holes.forEach(h => { h.active = false; h.hit = false; });
+
+            // Show mole in random hole
+            const index = Math.floor(Math.random() * 9);
+            this.currentMoleIndex = index;
+            this.holes[index].active = true;
+            this.moleAppearTime = performance.now();
+
+            // Mole disappears after a time if not whacked (gets faster as game progresses)
+            const baseTime = 1500;
+            const minTime = 600;
+            const progress = this.molesWhacked / this.totalMoles;
+            const moleTime = baseTime - (baseTime - minTime) * progress;
+
+            this.moleTimeout = setTimeout(() => {
+                if (this.holes[index].active && this.state === 'playing') {
+                    this.holes[index].active = false;
+                    this.showMole();
+                }
+            }, moleTime);
+        },
+
+        whack(index) {
+            if (this.state !== 'playing') return;
+            if (!this.holes[index].active) return;
+
+            // Calculate points based on reaction time
+            const reactionTime = performance.now() - this.moleAppearTime;
+            // Faster reaction = more points (max 100 points for < 200ms, min 10 for > 1000ms)
+            let points;
+            if (reactionTime < 200) {
+                points = 100;
+            } else if (reactionTime > 1000) {
+                points = 10;
+            } else {
+                // Linear scale from 100 to 10 between 200ms and 1000ms
+                points = Math.round(100 - (reactionTime - 200) * (90 / 800));
+            }
+
+            this.score += points;
+            this.molesWhacked++;
+            this.holes[index].active = false;
+            this.holes[index].hit = true;
+
+            clearTimeout(this.moleTimeout);
+
+            // Show hit effect briefly
+            setTimeout(() => {
+                this.holes[index].hit = false;
+            }, 200);
+
+            // Check if game complete
+            if (this.molesWhacked >= this.totalMoles) {
+                this.endGame();
+            } else {
+                // Show next mole after brief delay
+                setTimeout(() => this.showMole(), 300);
+            }
+        },
+
+        endGame() {
+            this.state = 'finished';
+            clearInterval(this.timerInterval);
+            clearTimeout(this.moleTimeout);
+            this.holes.forEach(h => { h.active = false; h.hit = false; });
+        },
+
+        async submitScore() {
+            if (!this.playerName.trim()) return;
+
+            this.state = 'submitting';
+            this.error = null;
+
+            try {
+                const response = await fetch('/api/v1/scores/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + this.apiToken
+                    },
+                    body: JSON.stringify({
+                        player_name: this.playerName.trim(),
+                        score: this.score
+                    })
+                });
+
+                if (response.ok) {
+                    this.state = 'submitted';
+                    // Refresh leaderboard
+                    const leaderboardEl = document.querySelector('#leaderboard');
+                    if (leaderboardEl && leaderboardEl._x_dataStack) {
+                        leaderboardEl._x_dataStack[0].fetchScores();
+                    }
+                } else {
+                    const data = await response.json();
+                    this.error = data.error || 'Failed to submit score';
+                    this.state = 'finished';
+                }
+            } catch (e) {
+                this.error = 'Network error. Please try again.';
+                this.state = 'finished';
+            }
+        },
+
+        reset() {
+            this.state = 'ready';
+            this.score = 0;
+            this.molesWhacked = 0;
+            this.timeLeft = 30;
+            this.error = null;
+            this.holes.forEach(h => { h.active = false; h.hit = false; });
+        }
+    };
+}
+
+function leaderboardPreview(gameSlug, leaderboardSlug) {
+    return {
+        scores: [],
+        loading: true,
+
+        async fetchScores() {
+            this.loading = true;
+            try {
+                const response = await fetch(`/api/v1/scores/${gameSlug}/${leaderboardSlug}/?limit=10`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.scores = data.scores;
+                }
+            } catch (e) {
+                console.error('Failed to fetch scores:', e);
+            }
+            this.loading = false;
+        }
+    };
+}
+</script>
+{% endblock %}

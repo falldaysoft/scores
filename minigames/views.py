@@ -19,3 +19,8 @@ class MemoryGameView(TemplateView):
 class TargetGameView(TemplateView):
     """Standalone page for Target Shooting game"""
     template_name = 'minigames/target.html'
+
+
+class WhackGameView(TemplateView):
+    """Standalone page for Whack-a-Mole game"""
+    template_name = 'minigames/whack.html'
