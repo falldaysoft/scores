@@ -11,6 +11,7 @@ DEMO_API_TOKENS = {
     'memory-sequence': 'demo_memory_sequence_public_token_v1',
     'target-shooting': 'demo_target_shooting_public_token_v1',
     'whack-a-mole': 'demo_whack_a_mole_public_token_v1',
+    'snowflakes': 'demo_snowflakes_public_token_v1',
 }
 
 
@@ -44,6 +45,12 @@ class Command(BaseCommand):
             'name': 'Whack-a-Mole',
             'slug': 'whack-a-mole',
             'description': 'Whack moles as they pop up! Faster hits = more points.',
+            'sort_order': 'desc',  # Higher score = better
+        },
+        {
+            'name': 'Snowflake Catcher',
+            'slug': 'snowflakes',
+            'description': 'Catch falling snowflakes before they hit the ground! Smaller = more points.',
             'sort_order': 'desc',  # Higher score = better
         },
     ]

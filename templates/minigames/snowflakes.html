@@ -1,0 +1,442 @@
+{% extends 'base.html' %}
+
+{% block title %}Snowflake Catcher{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-b from-slate-900 via-blue-900 to-slate-800 min-h-screen py-12">
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-8">
+            <a href="{% url 'minigames:play' %}" class="text-blue-300 hover:text-white transition">&larr; Back to games</a>
+            <h1 class="text-4xl font-bold text-white mt-4 mb-2">Snowflake Catcher</h1>
+            <p class="text-blue-200">Move the basket to catch falling snowflakes!</p>
+        </div>
+
+        <div x-data="snowflakeGame()" class="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <!-- Game Stats -->
+            <div class="flex justify-between items-center mb-4 text-white">
+                <div class="text-xl font-bold">Score: <span x-text="score" class="text-cyan-400"></span></div>
+                <div class="text-xl font-bold">Time: <span x-text="timeLeft" class="text-yellow-400"></span>s</div>
+                <div class="text-xl font-bold">Caught: <span x-text="caught" class="text-green-400"></span> Missed: <span x-text="missed" class="text-red-400"></span></div>
+            </div>
+
+            <!-- Game Area -->
+            <div class="relative">
+                <!-- Start/Game Over Overlay -->
+                <div
+                    x-show="state === 'ready' || state === 'finished' || state === 'submitting' || state === 'submitted'"
+                    class="absolute inset-0 bg-black/70 rounded-xl flex items-center justify-center z-10"
+                >
+                    <div class="text-center text-white">
+                        <template x-if="state === 'ready'">
+                            <div>
+                                <p class="text-6xl mb-4">❄️</p>
+                                <p class="text-2xl font-bold mb-4">Catch the Snowflakes!</p>
+                                <p class="text-sm opacity-75 mb-4">Move your mouse (or finger) to control the basket.<br>Smaller snowflakes = more points!</p>
+                                <button @click="start()" class="px-8 py-4 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg transition text-xl">
+                                    Start Game
+                                </button>
+                            </div>
+                        </template>
+                        <template x-if="state === 'finished' || state === 'submitting' || state === 'submitted'">
+                            <div>
+                                <p class="text-xl mb-2">Your Score:</p>
+                                <p class="text-5xl font-bold text-cyan-400" x-text="score"></p>
+                                <p class="text-sm text-blue-300 mt-2">Caught <span x-text="caught"></span> snowflakes!</p>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Game Canvas -->
+                <div
+                    id="game-area"
+                    @mousedown="startDrag($event)"
+                    @touchstart.prevent="handleTouchStart($event)"
+                    @touchmove.prevent="handleTouchMove($event)"
+                    class="relative bg-gradient-to-b from-slate-800 to-slate-900 rounded-xl overflow-hidden select-none cursor-grab"
+                    :class="{ 'cursor-grabbing': isDragging }"
+                    style="height: 450px;"
+                >
+                    <!-- Snowflakes -->
+                    <template x-for="flake in snowflakes" :key="flake.id">
+                        <div
+                            class="absolute select-none pointer-events-none"
+                            :style="`left: ${flake.x}px; top: ${flake.y}px; font-size: ${flake.size}px; opacity: ${flake.opacity}; transform: rotate(${flake.rotation}deg);`"
+                        >
+                            ❄️
+                        </div>
+                    </template>
+
+                    <!-- Catch effects -->
+                    <template x-for="effect in catchEffects" :key="effect.id">
+                        <div
+                            class="absolute text-2xl animate-ping pointer-events-none"
+                            :style="`left: ${effect.x}px; top: ${effect.y}px;`"
+                        >
+                            ✨
+                        </div>
+                    </template>
+
+                    <!-- Paddle/Platter Catcher -->
+                    <div
+                        class="absolute bottom-4 pointer-events-none transition-transform duration-75"
+                        :style="`left: ${basketX - basketWidth/2}px; width: ${basketWidth}px;`"
+                    >
+                        <!-- Paddle shape -->
+                        <div class="h-4 bg-gradient-to-b from-cyan-400 to-cyan-600 rounded-full border-2 border-cyan-300 shadow-lg shadow-cyan-500/50"></div>
+                    </div>
+
+                    <!-- Ground/Snow -->
+                    <div class="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-t from-white/40 to-white/10"></div>
+                </div>
+            </div>
+
+            <!-- Score Submission Form -->
+            <div x-show="state === 'finished'" x-cloak class="mt-6">
+                <form @submit.prevent="submitScore()" class="flex flex-col sm:flex-row gap-4">
+                    <input
+                        type="text"
+                        x-model="playerName"
+                        placeholder="Enter your name"
+                        maxlength="50"
+                        required
+                        class="flex-1 px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                    <button
+                        type="submit"
+                        class="px-6 py-3 bg-cyan-500 hover:bg-cyan-600 text-white font-bold rounded-lg transition"
+                    >
+                        Submit Score
+                    </button>
+                </form>
+            </div>
+
+            <!-- Submitting State -->
+            <div x-show="state === 'submitting'" x-cloak class="mt-6 text-center text-white">
+                <p>Submitting score...</p>
+            </div>
+
+            <!-- Submitted State -->
+            <div x-show="state === 'submitted'" x-cloak class="mt-6 text-center">
+                <p class="text-cyan-400 text-xl font-bold mb-4">Score submitted!</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button @click="reset()" class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-lg transition">
+                        Play Again
+                    </button>
+                    <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='snowflakes' %}" class="px-6 py-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition text-center">
+                        View Leaderboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div x-show="error && state === 'finished'" x-cloak class="mt-6 text-center">
+                <p class="text-red-400 mb-4" x-text="error"></p>
+                <button @click="reset()" class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-lg transition">
+                    Try Again
+                </button>
+            </div>
+        </div>
+
+        <!-- Leaderboard Preview -->
+        <div class="mt-8 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <h2 class="text-xl font-bold text-white mb-4">Top Scores</h2>
+            <div id="leaderboard" x-data="leaderboardPreview('mini-games', 'snowflakes')" x-init="fetchScores()">
+                <div x-show="loading" class="text-blue-200">Loading...</div>
+                <div x-show="!loading && scores.length === 0" class="text-blue-200">No scores yet. Be the first!</div>
+                <ul x-show="!loading && scores.length > 0" class="space-y-2">
+                    <template x-for="(s, i) in scores" :key="i">
+                        <li class="flex justify-between items-center py-2 px-4 rounded-lg" :class="i < 3 ? 'bg-white/10' : ''">
+                            <div class="flex items-center gap-3">
+                                <span class="text-blue-300 font-mono w-6" x-text="'#' + s.rank"></span>
+                                <span class="text-white" x-text="s.player_name"></span>
+                            </div>
+                            <span class="text-cyan-400 font-bold" x-text="s.score + ' pts'"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Leaderboard Link -->
+        <p class="mt-4 text-center text-blue-300 text-sm">
+            <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='snowflakes' %}" class="hover:text-white transition underline">View full leaderboard</a>
+        </p>
+    </div>
+</div>
+
+<script>
+function snowflakeGame() {
+    return {
+        state: 'ready', // ready, playing, finished, submitting, submitted
+        score: 0,
+        timeLeft: 30,
+        caught: 0,
+        missed: 0,
+        playerName: '',
+        error: null,
+        apiToken: 'demo_snowflakes_public_token_v1',
+        snowflakes: [],
+        catchEffects: [],
+        gameInterval: null,
+        timerInterval: null,
+        spawnInterval: null,
+        nextFlakeId: 0,
+        nextEffectId: 0,
+        gameArea: null,
+        gameWidth: 0,
+        gameHeight: 450,
+        basketX: 0,
+        basketWidth: 100,
+        basketHeight: 16,
+        isDragging: false,
+
+        init() {
+            this.gameArea = document.getElementById('game-area');
+            this.updateGameWidth();
+            this.basketX = this.gameWidth / 2;
+
+            // Global mouse move and up handlers for drag capture
+            document.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+            document.addEventListener('mouseup', () => this.stopDrag());
+
+            window.addEventListener('resize', () => {
+                this.updateGameWidth();
+                // Keep basket in bounds after resize
+                this.basketX = Math.max(this.basketWidth/2, Math.min(this.gameWidth - this.basketWidth/2, this.basketX));
+            });
+        },
+
+        updateGameWidth() {
+            if (this.gameArea) {
+                this.gameWidth = this.gameArea.offsetWidth;
+            }
+        },
+
+        startDrag(event) {
+            if (this.state !== 'playing') return;
+            this.isDragging = true;
+            this.updateBasketPosition(event.clientX);
+        },
+
+        stopDrag() {
+            this.isDragging = false;
+        },
+
+        handleMouseMove(event) {
+            if (this.state !== 'playing' || !this.isDragging) return;
+            this.updateBasketPosition(event.clientX);
+        },
+
+        handleTouchStart(event) {
+            if (this.state !== 'playing') return;
+            const touch = event.touches[0];
+            this.updateBasketPosition(touch.clientX);
+        },
+
+        handleTouchMove(event) {
+            if (this.state !== 'playing') return;
+            const touch = event.touches[0];
+            this.updateBasketPosition(touch.clientX);
+        },
+
+        updateBasketPosition(clientX) {
+            const rect = this.gameArea.getBoundingClientRect();
+            const x = clientX - rect.left;
+            this.basketX = Math.max(this.basketWidth/2, Math.min(this.gameWidth - this.basketWidth/2, x));
+        },
+
+        start() {
+            this.state = 'playing';
+            this.score = 0;
+            this.caught = 0;
+            this.missed = 0;
+            this.timeLeft = 15;
+            this.error = null;
+            this.snowflakes = [];
+            this.catchEffects = [];
+            this.updateGameWidth();
+            this.basketX = this.gameWidth / 2;
+
+            // Start timer countdown
+            this.timerInterval = setInterval(() => {
+                this.timeLeft--;
+                if (this.timeLeft <= 0) {
+                    this.endGame();
+                }
+            }, 1000);
+
+            // Spawn snowflakes
+            this.spawnInterval = setInterval(() => {
+                this.spawnSnowflake();
+            }, 500);
+
+            // Game loop for moving snowflakes
+            this.gameInterval = setInterval(() => {
+                this.updateSnowflakes();
+            }, 16); // ~60fps
+        },
+
+        spawnSnowflake() {
+            if (this.state !== 'playing') return;
+
+            // Random size determines points (smaller = more points, harder to catch)
+            const size = 20 + Math.random() * 30; // 20-50px
+            const points = Math.round(60 - size); // Smaller = more points (10-40)
+
+            // Speed increases slightly over time
+            const progress = 1 - (this.timeLeft / 15);
+            const baseSpeed = 2 + progress * 2; // 2 to 4
+            const speed = baseSpeed + Math.random() * 1;
+
+            const flake = {
+                id: this.nextFlakeId++,
+                x: Math.random() * (this.gameWidth - size),
+                y: -size,
+                size: size,
+                speed: speed,
+                points: points,
+                opacity: 0.7 + Math.random() * 0.3,
+                rotation: Math.random() * 360,
+                rotationSpeed: (Math.random() - 0.5) * 3,
+                drift: (Math.random() - 0.5) * 0.8, // Slight horizontal drift
+            };
+
+            this.snowflakes.push(flake);
+        },
+
+        updateSnowflakes() {
+            if (this.state !== 'playing') return;
+
+            const basketTop = this.gameHeight - 16 - this.basketHeight; // 16px from bottom + basket height
+            const basketLeft = this.basketX - this.basketWidth / 2;
+            const basketRight = this.basketX + this.basketWidth / 2;
+
+            this.snowflakes = this.snowflakes.filter(flake => {
+                // Move down and drift
+                flake.y += flake.speed;
+                flake.x += flake.drift;
+                flake.rotation += flake.rotationSpeed;
+
+                // Keep in bounds horizontally
+                if (flake.x < 0) flake.x = 0;
+                if (flake.x > this.gameWidth - flake.size) flake.x = this.gameWidth - flake.size;
+
+                const flakeCenterX = flake.x + flake.size / 2;
+                const flakeBottom = flake.y + flake.size;
+
+                // Check if caught by basket
+                if (flakeBottom >= basketTop && flake.y <= basketTop + 20) {
+                    if (flakeCenterX >= basketLeft && flakeCenterX <= basketRight) {
+                        // Caught!
+                        this.score += flake.points;
+                        this.caught++;
+
+                        // Add catch effect
+                        this.catchEffects.push({
+                            id: this.nextEffectId++,
+                            x: flake.x,
+                            y: flake.y
+                        });
+
+                        // Remove effect after animation
+                        const effectId = this.nextEffectId - 1;
+                        setTimeout(() => {
+                            this.catchEffects = this.catchEffects.filter(e => e.id !== effectId);
+                        }, 500);
+
+                        return false; // Remove snowflake
+                    }
+                }
+
+                // Check if hit ground (missed)
+                if (flake.y > this.gameHeight - flake.size) {
+                    this.missed++;
+                    return false; // Remove
+                }
+
+                return true; // Keep
+            });
+        },
+
+        endGame() {
+            this.state = 'finished';
+            clearInterval(this.timerInterval);
+            clearInterval(this.spawnInterval);
+            clearInterval(this.gameInterval);
+            this.snowflakes = [];
+            this.catchEffects = [];
+        },
+
+        async submitScore() {
+            if (!this.playerName.trim()) return;
+
+            this.state = 'submitting';
+            this.error = null;
+
+            try {
+                const response = await fetch('/api/v1/scores/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + this.apiToken
+                    },
+                    body: JSON.stringify({
+                        player_name: this.playerName.trim(),
+                        score: this.score
+                    })
+                });
+
+                if (response.ok) {
+                    this.state = 'submitted';
+                    // Refresh leaderboard
+                    const leaderboardEl = document.querySelector('#leaderboard');
+                    if (leaderboardEl && leaderboardEl._x_dataStack) {
+                        leaderboardEl._x_dataStack[0].fetchScores();
+                    }
+                } else {
+                    const data = await response.json();
+                    this.error = data.error || 'Failed to submit score';
+                    this.state = 'finished';
+                }
+            } catch (e) {
+                this.error = 'Network error. Please try again.';
+                this.state = 'finished';
+            }
+        },
+
+        reset() {
+            this.state = 'ready';
+            this.score = 0;
+            this.caught = 0;
+            this.missed = 0;
+            this.timeLeft = 15;
+            this.error = null;
+            this.snowflakes = [];
+            this.catchEffects = [];
+        }
+    };
+}
+
+function leaderboardPreview(gameSlug, leaderboardSlug) {
+    return {
+        scores: [],
+        loading: true,
+
+        async fetchScores() {
+            this.loading = true;
+            try {
+                const response = await fetch(`/api/v1/scores/${gameSlug}/${leaderboardSlug}/?limit=10`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.scores = data.scores;
+                }
+            } catch (e) {
+                console.error('Failed to fetch scores:', e);
+            }
+            this.loading = false;
+        }
+    };
+}
+</script>
+{% endblock %}
