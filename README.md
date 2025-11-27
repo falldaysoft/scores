@@ -2,7 +2,8 @@
 
 A free leaderboard backend service for indie games. Submit and retrieve high scores via REST API, with a Django-based dashboard for game developers.
 
-Open source, self-host if you like. My intention is that this will be free for small
+Open source, self-host if you like, or start now with the free hosted version at
+https://scores.fallday.ca. My intention is that this will be free for small
 games, and for games that grow to a significant volume (tens of thousands of players
 per day), either suggest self-hosting, or have some paid plan to cover costs.
 
