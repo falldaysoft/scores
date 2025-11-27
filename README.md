@@ -46,6 +46,9 @@ The site includes three playable mini-games at `/play/` that demonstrate the lea
 - **Reaction Timer** - Click when the screen turns green
 - **Memory Sequence** - Remember and repeat color patterns
 - **Target Shooting** - Click targets within 10 seconds
+- **Whack-a-Mole** - Teach those moles a lesson
+
+Try them now, and submit your high scores, at htps://scores.fallday.ca/play
 
 Run `python manage.py setup_demo_games` to create the system user and demo leaderboards. This command is idempotent and can be run multiple times safely.
 
