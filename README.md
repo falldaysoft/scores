@@ -58,11 +58,27 @@ Run `python manage.py setup_demo_games` to create the system user and demo leade
 The API documentation is built into the dashboard; in a nutshell:
 
 ```bash
+# Without player_id: creates a new entry each time
 curl -X POST http://scores.fallday.ca/api/v1/scores/ \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer your-game-from-the-dashboard" \
+  -H "Authorization: Bearer your-token-from-the-dashboard" \
   -d '{"player_name": "bob", "score": 42000}'
+
+# Submit with player_id (one score per player - updates if exists)
+curl -X POST http://scores.fallday.ca/api/v1/scores/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-token-from-the-dashboard" \
+  -d '{"player_name": "bob", "player_id": "unique-player-identifier", "score": 42000}'
 ```
+
+### Player ID
+
+The optional `player_id` field enables one-score-per-player mode:
+
+- **Without `player_id`**: Every submission creates a new score entry
+- **With `player_id`**: If a score exists for that player on the leaderboard, it's updated; otherwise a new score is created
+
+Use any unique identifier for your players: a device UUID, Steam ID, Game Centre ID, or your own user ID. The `player_id` is never exposed in API responses to prevent players from overwriting others' scores.
 
 ## Tech Stack
 

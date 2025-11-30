@@ -24,6 +24,9 @@ class ScoreAPIView(APIView):
             )
 
         player_name = request.data.get('player_name', '').strip()
+        player_id = request.data.get('player_id')
+        if player_id is not None:
+            player_id = str(player_id).strip() or None  # Convert empty string to None
         score_value = request.data.get('score')
         metadata = request.data.get('metadata', {})
 
@@ -59,20 +62,40 @@ class ScoreAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        score = Score.objects.create(
-            leaderboard=leaderboard,
-            player_name=player_name,
-            score=score_value,
-            metadata=metadata
-        )
+        # If player_id provided, update existing score or create new one
+        created = False
+        if player_id:
+            score = Score.objects.filter(
+                leaderboard=leaderboard,
+                player_id=player_id
+            ).first()
+        else:
+            score = None
+
+        if score:
+            score.player_name = player_name
+            score.score = score_value
+            score.metadata = metadata
+            score.expires_at = None  # Will be recalculated on save
+            score.save()
+        else:
+            score = Score.objects.create(
+                leaderboard=leaderboard,
+                player_name=player_name,
+                player_id=player_id,
+                score=score_value,
+                metadata=metadata
+            )
+            created = True
 
         return Response({
             'id': score.id,
             'player_name': score.player_name,
             'score': score.score,
             'created_at': score.created_at.isoformat(),
+            'updated_at': score.updated_at.isoformat(),
             'expires_at': score.expires_at.isoformat(),
-        }, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def get(self, request):
         """Get leaderboard scores"""

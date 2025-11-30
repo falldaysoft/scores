@@ -142,6 +142,119 @@ class ScoreAPITest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data['scores']), 5)
 
+    def test_submit_score_with_player_id_creates_new(self):
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 1000
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Score.objects.count(), 1)
+        score = Score.objects.first()
+        self.assertEqual(score.player_id, 'user-123')
+        self.assertEqual(score.score, 1000)
+
+    def test_submit_score_with_player_id_updates_existing(self):
+        # First submission
+        self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 1000
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(Score.objects.count(), 1)
+
+        # Second submission with same player_id - should update, not create
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1 Updated',
+                'player_id': 'user-123',
+                'score': 2000
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 200)  # 200 for update, not 201
+        self.assertEqual(Score.objects.count(), 1)  # Still only one score
+        score = Score.objects.first()
+        self.assertEqual(score.player_name, 'Player1 Updated')
+        self.assertEqual(score.score, 2000)
+
+    def test_submit_score_without_player_id_always_creates(self):
+        # Two submissions without player_id should create two scores
+        self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'score': 1000},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'score': 2000},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(Score.objects.count(), 2)
+
+    def test_submit_score_empty_player_id_treated_as_none(self):
+        # Empty string player_id should be treated as no player_id
+        self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'player_id': '', 'score': 1000},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'player_id': '   ', 'score': 2000},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        # Both should create new scores since empty/whitespace player_id is treated as None
+        self.assertEqual(Score.objects.count(), 2)
+
+    def test_player_id_scoped_to_leaderboard(self):
+        # Same player_id on different leaderboards should create separate scores
+        other_leaderboard = Leaderboard.objects.create(game=self.game, name='Other Board')
+
+        self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'player_id': 'user-123', 'score': 1000},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'player_id': 'user-123', 'score': 2000},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {other_leaderboard.api_token}'
+        )
+        self.assertEqual(Score.objects.count(), 2)
+
+    def test_player_id_not_in_get_response(self):
+        Score.objects.create(
+            leaderboard=self.leaderboard,
+            player_name='Player1',
+            player_id='secret-id-123',
+            score=1000
+        )
+        response = self.client.get(
+            reverse('api:scores'),
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('player_id', response.data['scores'][0])
+
 
 class PublicScoreAPITest(TestCase):
     def setUp(self):
@@ -183,3 +296,19 @@ class PublicScoreAPITest(TestCase):
             })
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_public_player_id_not_exposed(self):
+        Score.objects.create(
+            leaderboard=self.leaderboard,
+            player_name='Player1',
+            player_id='secret-id-123',
+            score=1000
+        )
+        response = self.client.get(
+            reverse('api:public_scores', kwargs={
+                'game_slug': self.game.slug,
+                'leaderboard_slug': self.leaderboard.slug
+            })
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('player_id', response.data['scores'][0])

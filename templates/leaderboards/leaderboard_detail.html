@@ -88,23 +88,26 @@
                             <span class="text-sm font-medium text-gray-700">Submit a Score</span>
                             <button onclick="copyCode('js-submit')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
                         </div>
-                        <pre id="js-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>async function submitScore(playerName, score) {
+                        <pre id="js-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>async function submitScore(playerName, score, playerId = null) {
+  const body = { player_name: playerName, score: score };
+  if (playerId) body.player_id = playerId;
+
   const response = await fetch('{{ site_url }}/api/v1/scores/', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': 'Bearer {{ leaderboard.api_token }}'
     },
-    body: JSON.stringify({
-      player_name: playerName,
-      score: score
-    })
+    body: JSON.stringify(body)
   });
   return response.json();
 }
 
-// Example usage:
-submitScore('Player1', 42000);</code></pre>
+// Without player_id: creates a new score each time
+submitScore('Player1', 42000);
+
+// With player_id: one score per player (updates if exists)
+submitScore('Player1', 42000, 'unique-player-id');</code></pre>
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-2">
@@ -137,21 +140,25 @@ submitScore('Player1', 42000);</code></pre>
                         </div>
                         <pre id="py-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>import requests
 
-def submit_score(player_name, score):
+def submit_score(player_name, score, player_id=None):
+    data = {'player_name': player_name, 'score': score}
+    if player_id:
+        data['player_id'] = player_id
+
     response = requests.post(
         '{{ site_url }}/api/v1/scores/',
         headers={
             'Authorization': 'Bearer {{ leaderboard.api_token }}'
         },
-        json={
-            'player_name': player_name,
-            'score': score
-        }
+        json=data
     )
     return response.json()
 
-# Example usage:
-submit_score('Player1', 42000)</code></pre>
+# Without player_id: creates a new score each time
+submit_score('Player1', 42000)
+
+# With player_id: one score per player (updates if exists)
+submit_score('Player1', 42000, 'unique-player-id')</code></pre>
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-2">
@@ -181,10 +188,17 @@ def get_scores(limit=10):
                             <span class="text-sm font-medium text-gray-700">Submit a Score</span>
                             <button onclick="copyCode('curl-submit')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
                         </div>
-                        <pre id="curl-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>curl -X POST {{ site_url }}/api/v1/scores/ \
+                        <pre id="curl-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code># Without player_id: creates a new score each time
+curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {{ leaderboard.api_token }}" \
-  -d '{"player_name": "Player1", "score": 42000}'</code></pre>
+  -d '{"player_name": "Player1", "score": 42000}'
+
+# With player_id: one score per player (updates if exists)
+curl -X POST {{ site_url }}/api/v1/scores/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {{ leaderboard.api_token }}" \
+  -d '{"player_name": "Player1", "player_id": "unique-player-id", "score": 42000}'</code></pre>
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-2">

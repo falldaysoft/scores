@@ -45,9 +45,11 @@ class Leaderboard(models.Model):
 class Score(models.Model):
     leaderboard = models.ForeignKey(Leaderboard, on_delete=models.CASCADE, related_name='scores')
     player_name = models.CharField(max_length=50)
+    player_id = models.CharField(max_length=100, null=True)
     score = models.BigIntegerField()
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     expires_at = models.DateTimeField()
 
     class Meta:
@@ -55,6 +57,7 @@ class Score(models.Model):
         indexes = [
             models.Index(fields=['leaderboard', '-score']),
             models.Index(fields=['expires_at']),
+            models.Index(fields=['leaderboard', 'player_id']),
         ]
 
     def __str__(self):
