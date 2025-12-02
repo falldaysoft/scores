@@ -88,3 +88,38 @@ class AccountSettingsForm(forms.ModelForm):
         else:
             return None
         return account_name
+
+
+class AccountDeleteConfirmForm(forms.Form):
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+            'placeholder': 'Enter your password',
+            'autocomplete': 'current-password',
+        })
+    )
+    confirmation = forms.CharField(
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+            'autocomplete': 'off',
+        })
+    )
+
+    def __init__(self, *args, user=None, confirmation_code=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        self.confirmation_code = confirmation_code
+        if confirmation_code:
+            self.fields['confirmation'].widget.attrs['placeholder'] = f'Type {confirmation_code} to confirm'
+
+    def clean_password(self):
+        password = self.cleaned_data.get('password')
+        if self.user and not self.user.check_password(password):
+            raise forms.ValidationError('Incorrect password.')
+        return password
+
+    def clean_confirmation(self):
+        confirmation = self.cleaned_data.get('confirmation')
+        if confirmation != self.confirmation_code:
+            raise forms.ValidationError(f'Please type "{self.confirmation_code}" exactly to confirm deletion.')
+        return confirmation

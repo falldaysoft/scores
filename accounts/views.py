@@ -1,14 +1,18 @@
+import secrets
+import string
+
 from django.shortcuts import render, redirect
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView, LogoutView
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.conf import settings
 from django.urls import reverse
 from django.views import View
+from django.http import HttpResponse
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from .forms import SignupForm, LoginForm, AccountSettingsForm
+from .forms import SignupForm, LoginForm, AccountSettingsForm, AccountDeleteConfirmForm
 from .models import User
 
 
@@ -94,3 +98,64 @@ class AccountSettingsView(LoginRequiredMixin, View):
             messages.success(request, 'Account settings updated.')
             return redirect('accounts:settings')
         return render(request, 'accounts/settings.html', {'form': form})
+
+
+class AccountDeleteView(LoginRequiredMixin, View):
+    def _generate_confirmation_code(self):
+        """Generate a random 6-character alphanumeric confirmation code."""
+        chars = string.ascii_uppercase + string.digits
+        return ''.join(secrets.choice(chars) for _ in range(6))
+
+    def _get_confirmation_code(self, request):
+        """Get or create a confirmation code for this session."""
+        if 'delete_confirmation_code' not in request.session:
+            request.session['delete_confirmation_code'] = self._generate_confirmation_code()
+        return request.session['delete_confirmation_code']
+
+    def _get_data_counts(self, user):
+        """Count all data that will be deleted with the account."""
+        games = user.games.all()
+        game_count = games.count()
+        leaderboard_count = sum(g.leaderboards.count() for g in games)
+        score_count = sum(lb.scores.count() for g in games for lb in g.leaderboards.all())
+        return {
+            'game_count': game_count,
+            'leaderboard_count': leaderboard_count,
+            'score_count': score_count,
+        }
+
+    def get(self, request):
+        confirmation_code = self._get_confirmation_code(request)
+        form = AccountDeleteConfirmForm(user=request.user, confirmation_code=confirmation_code)
+        context = {
+            'form': form,
+            'confirmation_code': confirmation_code,
+            **self._get_data_counts(request.user),
+        }
+        return render(request, 'accounts/account_delete_confirm.html', context)
+
+    def post(self, request):
+        confirmation_code = self._get_confirmation_code(request)
+        form = AccountDeleteConfirmForm(
+            request.POST,
+            user=request.user,
+            confirmation_code=confirmation_code
+        )
+        if form.is_valid():
+            # Clear the confirmation code from session
+            if 'delete_confirmation_code' in request.session:
+                del request.session['delete_confirmation_code']
+            # Store email before deletion for the confirmation page
+            deleted_email = request.user.email
+            # Delete the user (cascades to games, leaderboards, scores)
+            request.user.delete()
+            logout(request)
+            return render(request, 'accounts/account_deleted.html', {
+                'deleted_email': deleted_email,
+            })
+        context = {
+            'form': form,
+            'confirmation_code': confirmation_code,
+            **self._get_data_counts(request.user),
+        }
+        return render(request, 'accounts/account_delete_confirm.html', context)
