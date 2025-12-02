@@ -312,3 +312,152 @@ class PublicScoreAPITest(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertNotIn('player_id', response.data['scores'][0])
+
+
+class CorrectAnswerLeaderboardTest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.game = Game.objects.create(owner=self.user, name='Puzzle Game')
+        self.puzzle_leaderboard = Leaderboard.objects.create(
+            game=self.game,
+            name='Puzzle Board',
+            leaderboard_type='correct_answer',
+            correct_answer='The Answer'
+        )
+
+    def test_submit_correct_answer_without_score(self):
+        """Test submitting correct answer without score defaults to 0"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'answer': 'the answer'},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Score.objects.count(), 1)
+        self.assertEqual(Score.objects.first().score, 0)
+
+    def test_submit_correct_answer_with_score(self):
+        """Test submitting correct answer with optional time score"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'answer': 'the answer', 'score': 5000},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(Score.objects.first().score, 5000)
+
+    def test_submit_wrong_answer(self):
+        """Test that wrong answer returns 400 error"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'answer': 'wrong answer'},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Incorrect answer', response.data['error'])
+        self.assertEqual(Score.objects.count(), 0)
+
+    def test_submit_missing_answer(self):
+        """Test that missing answer returns 400 error for puzzle leaderboards"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1'},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('answer is required', response.data['error'])
+
+    def test_answer_case_insensitive(self):
+        """Test that answer comparison is case insensitive"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'answer': 'THE ANSWER'},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_answer_whitespace_insensitive(self):
+        """Test that answer comparison ignores extra whitespace"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'answer': '  the   answer  '},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_answer_punctuation_insensitive(self):
+        """Test that answer comparison ignores punctuation"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'answer': 'the answer!'},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_answer_combined_normalization(self):
+        """Test that all normalizations work together"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'answer': '  THE   ANSWER!!  '},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_standard_leaderboard_requires_score(self):
+        """Test that standard leaderboards still require score"""
+        standard_leaderboard = Leaderboard.objects.create(
+            game=self.game,
+            name='Standard Board',
+            leaderboard_type='score'
+        )
+        response = self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1'},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {standard_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('score is required', response.data['error'])
+
+    def test_standard_leaderboard_ignores_answer(self):
+        """Test that standard leaderboards ignore answer field"""
+        standard_leaderboard = Leaderboard.objects.create(
+            game=self.game,
+            name='Standard Board',
+            leaderboard_type='score'
+        )
+        response = self.client.post(
+            reverse('api:scores'),
+            {'player_name': 'Player1', 'score': 1000, 'answer': 'anything'},
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {standard_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+
+    def test_get_response_includes_leaderboard_type(self):
+        """Test that GET response includes leaderboard type and display settings"""
+        Score.objects.create(
+            leaderboard=self.puzzle_leaderboard,
+            player_name='Player1',
+            score=0
+        )
+        response = self.client.get(
+            reverse('api:scores'),
+            HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['leaderboard']['type'], 'correct_answer')
+        self.assertIn('show_score', response.data['leaderboard'])
+        self.assertIn('show_date', response.data['leaderboard'])

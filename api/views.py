@@ -29,6 +29,7 @@ class ScoreAPIView(APIView):
             player_id = str(player_id).strip() or None  # Convert empty string to None
         score_value = request.data.get('score')
         metadata = request.data.get('metadata', {})
+        answer = request.data.get('answer')
 
         if not player_name:
             return Response(
@@ -42,11 +43,28 @@ class ScoreAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        if score_value is None:
-            return Response(
-                {'error': 'score is required'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # Handle correct_answer type leaderboards
+        if leaderboard.leaderboard_type == 'correct_answer':
+            if not answer:
+                return Response(
+                    {'error': 'answer is required for this leaderboard'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            if not leaderboard.check_answer(answer):
+                return Response(
+                    {'error': 'Incorrect answer'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            # Score is optional for correct_answer leaderboards
+            if score_value is None:
+                score_value = 0
+        else:
+            # Standard leaderboard requires score
+            if score_value is None:
+                return Response(
+                    {'error': 'score is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         try:
             score_value = int(score_value)
@@ -112,6 +130,10 @@ class ScoreAPIView(APIView):
         scores = leaderboard.scores.filter(expires_at__gt=timezone.now())
         if leaderboard.sort_order == 'asc':
             scores = scores.order_by('score')
+        elif leaderboard.sort_order == 'newest':
+            scores = scores.order_by('-created_at')
+        elif leaderboard.sort_order == 'oldest':
+            scores = scores.order_by('created_at')
         else:
             scores = scores.order_by('-score')
 
@@ -122,6 +144,9 @@ class ScoreAPIView(APIView):
                 'name': leaderboard.name,
                 'game': leaderboard.game.name,
                 'sort_order': leaderboard.sort_order,
+                'type': leaderboard.leaderboard_type,
+                'show_score': leaderboard.show_score,
+                'show_date': leaderboard.show_date,
             },
             'scores': [
                 {
@@ -152,6 +177,10 @@ class PublicScoreAPIView(APIView):
         scores = leaderboard.scores.filter(expires_at__gt=timezone.now())
         if leaderboard.sort_order == 'asc':
             scores = scores.order_by('score')
+        elif leaderboard.sort_order == 'newest':
+            scores = scores.order_by('-created_at')
+        elif leaderboard.sort_order == 'oldest':
+            scores = scores.order_by('created_at')
         else:
             scores = scores.order_by('-score')
 
@@ -162,6 +191,9 @@ class PublicScoreAPIView(APIView):
                 'name': leaderboard.name,
                 'game': leaderboard.game.name,
                 'sort_order': leaderboard.sort_order,
+                'type': leaderboard.leaderboard_type,
+                'show_score': leaderboard.show_score,
+                'show_date': leaderboard.show_date,
             },
             'scores': [
                 {

@@ -20,6 +20,7 @@
             <div>
                 <div class="flex items-center gap-3">
                     <h1 class="text-3xl font-bold text-gray-900">{{ leaderboard.name }}</h1>
+                    <span class="bg-indigo-100 text-indigo-700 px-2 py-1 rounded text-sm">{{ leaderboard.get_leaderboard_type_display }}</span>
                     <span class="bg-gray-100 px-2 py-1 rounded text-sm text-gray-500">{{ leaderboard.get_sort_order_display }}</span>
                 </div>
                 {% if leaderboard.description %}
@@ -88,6 +89,32 @@
                             <span class="text-sm font-medium text-gray-700">Submit a Score</span>
                             <button onclick="copyCode('js-submit')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
                         </div>
+                        {% if leaderboard.leaderboard_type == 'correct_answer' %}
+                        <pre id="js-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>async function submitAnswer(playerName, answer, score = null, playerId = null) {
+  const body = { player_name: playerName, answer: answer };
+  if (score !== null) body.score = score;
+  if (playerId) body.player_id = playerId;
+
+  const response = await fetch('{{ site_url }}/api/v1/scores/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer {{ leaderboard.api_token }}'
+    },
+    body: JSON.stringify(body)
+  });
+  return response.json();
+}
+
+// Submit answer only (score defaults to 0)
+submitAnswer('Player1', 'the answer');
+
+// Submit answer with time score (e.g., milliseconds to solve)
+submitAnswer('Player1', 'the answer', 5432);
+
+// With player_id: one entry per player (updates if exists)
+submitAnswer('Player1', 'the answer', 5432, 'unique-player-id');</code></pre>
+                        {% else %}
                         <pre id="js-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>async function submitScore(playerName, score, playerId = null) {
   const body = { player_name: playerName, score: score };
   if (playerId) body.player_id = playerId;
@@ -108,6 +135,7 @@ submitScore('Player1', 42000);
 
 // With player_id: one score per player (updates if exists)
 submitScore('Player1', 42000, 'unique-player-id');</code></pre>
+                        {% endif %}
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-2">
@@ -138,6 +166,34 @@ submitScore('Player1', 42000, 'unique-player-id');</code></pre>
                             <span class="text-sm font-medium text-gray-700">Submit a Score</span>
                             <button onclick="copyCode('py-submit')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
                         </div>
+                        {% if leaderboard.leaderboard_type == 'correct_answer' %}
+                        <pre id="py-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>import requests
+
+def submit_answer(player_name, answer, score=None, player_id=None):
+    data = {'player_name': player_name, 'answer': answer}
+    if score is not None:
+        data['score'] = score
+    if player_id:
+        data['player_id'] = player_id
+
+    response = requests.post(
+        '{{ site_url }}/api/v1/scores/',
+        headers={
+            'Authorization': 'Bearer {{ leaderboard.api_token }}'
+        },
+        json=data
+    )
+    return response.json()
+
+# Submit answer only (score defaults to 0)
+submit_answer('Player1', 'the answer')
+
+# Submit answer with time score (e.g., milliseconds to solve)
+submit_answer('Player1', 'the answer', 5432)
+
+# With player_id: one entry per player (updates if exists)
+submit_answer('Player1', 'the answer', 5432, 'unique-player-id')</code></pre>
+                        {% else %}
                         <pre id="py-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>import requests
 
 def submit_score(player_name, score, player_id=None):
@@ -159,6 +215,7 @@ submit_score('Player1', 42000)
 
 # With player_id: one score per player (updates if exists)
 submit_score('Player1', 42000, 'unique-player-id')</code></pre>
+                        {% endif %}
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-2">
@@ -188,6 +245,25 @@ def get_scores(limit=10):
                             <span class="text-sm font-medium text-gray-700">Submit a Score</span>
                             <button onclick="copyCode('curl-submit')" class="text-xs text-indigo-600 hover:text-indigo-800">Copy</button>
                         </div>
+                        {% if leaderboard.leaderboard_type == 'correct_answer' %}
+                        <pre id="curl-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code># Submit answer only (score defaults to 0)
+curl -X POST {{ site_url }}/api/v1/scores/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {{ leaderboard.api_token }}" \
+  -d '{"player_name": "Player1", "answer": "the answer"}'
+
+# Submit answer with time score
+curl -X POST {{ site_url }}/api/v1/scores/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {{ leaderboard.api_token }}" \
+  -d '{"player_name": "Player1", "answer": "the answer", "score": 5432}'
+
+# With player_id: one entry per player (updates if exists)
+curl -X POST {{ site_url }}/api/v1/scores/ \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer {{ leaderboard.api_token }}" \
+  -d '{"player_name": "Player1", "answer": "the answer", "player_id": "unique-player-id"}'</code></pre>
+                        {% else %}
                         <pre id="curl-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code># Without player_id: creates a new score each time
 curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Content-Type: application/json" \
@@ -199,6 +275,7 @@ curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {{ leaderboard.api_token }}" \
   -d '{"player_name": "Player1", "player_id": "unique-player-id", "score": 42000}'</code></pre>
+                        {% endif %}
                     </div>
                     <div>
                         <div class="flex justify-between items-center mb-2">
@@ -227,8 +304,12 @@ curl {{ site_url }}/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code>
                         <tr class="border-b border-gray-200">
                             <th class="py-3 text-left text-sm font-medium text-gray-500">#</th>
                             <th class="py-3 text-left text-sm font-medium text-gray-500">Player</th>
+                            {% if leaderboard.show_score %}
                             <th class="py-3 text-right text-sm font-medium text-gray-500">Score</th>
+                            {% endif %}
+                            {% if leaderboard.show_date %}
                             <th class="py-3 text-right text-sm font-medium text-gray-500">Date</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -246,8 +327,12 @@ curl {{ site_url }}/api/v1/scores/{{ game.slug }}/{{ leaderboard.slug }}/</code>
                                 {% endif %}
                             </td>
                             <td class="py-3 text-sm font-medium text-gray-900">{{ score.player_name }}</td>
+                            {% if leaderboard.show_score %}
                             <td class="py-3 text-sm text-gray-900 text-right font-mono">{{ score.score|floatformat:0 }}</td>
-                            <td class="py-3 text-sm text-gray-500 text-right">{{ score.created_at|timesince }} ago</td>
+                            {% endif %}
+                            {% if leaderboard.show_date %}
+                            <td class="py-3 text-sm text-gray-500 text-right local-time" data-utc="{{ score.created_at|date:'c' }}">{{ score.created_at|timesince }} ago</td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -276,5 +361,12 @@ function copyToken() {
         alert('Token copied to clipboard!');
     });
 }
+
+document.querySelectorAll('.local-time').forEach(el => {
+    const utc = el.dataset.utc;
+    if (utc) {
+        el.title = new Date(utc).toLocaleString();
+    }
+});
 </script>
 {% endblock %}

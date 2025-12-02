@@ -1,3 +1,4 @@
+import re
 import secrets
 from django.conf import settings
 from django.db import models
@@ -11,6 +12,13 @@ class Leaderboard(models.Model):
     SORT_ORDER_CHOICES = [
         ('desc', 'Highest First'),
         ('asc', 'Lowest First'),
+        ('newest', 'Newest First'),
+        ('oldest', 'Oldest First'),
+    ]
+
+    LEADERBOARD_TYPE_CHOICES = [
+        ('score', 'Score'),
+        ('correct_answer', 'Correct Answer'),
     ]
 
     game = models.ForeignKey('games.Game', on_delete=models.CASCADE, related_name='leaderboards')
@@ -18,7 +26,15 @@ class Leaderboard(models.Model):
     slug = models.SlugField(max_length=100)
     description = models.TextField(blank=True)
     api_token = models.CharField(max_length=64, unique=True, editable=False)
-    sort_order = models.CharField(max_length=4, choices=SORT_ORDER_CHOICES, default='desc')
+    sort_order = models.CharField(max_length=10, choices=SORT_ORDER_CHOICES, default='desc')
+    leaderboard_type = models.CharField(
+        max_length=20,
+        choices=LEADERBOARD_TYPE_CHOICES,
+        default='score'
+    )
+    correct_answer = models.CharField(max_length=64, blank=True, null=True)
+    show_score = models.BooleanField(default=True)
+    show_date = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -41,12 +57,34 @@ class Leaderboard(models.Model):
         self.save(update_fields=['api_token'])
         return self.api_token
 
+    def normalize_answer(self, answer):
+        """Normalize answer for comparison: lowercase, strip whitespace, remove punctuation."""
+        if not answer:
+            return ''
+        # Convert to lowercase
+        normalized = answer.lower()
+        # Remove leading/trailing whitespace
+        normalized = normalized.strip()
+        # Remove all punctuation
+        normalized = re.sub(r'[^\w\s]', '', normalized)
+        # Collapse multiple whitespace to single space
+        normalized = re.sub(r'\s+', ' ', normalized)
+        return normalized
+
+    def check_answer(self, submitted_answer):
+        """Check if submitted answer matches the correct answer."""
+        if self.leaderboard_type != 'correct_answer':
+            return True  # Non-puzzle leaderboards always pass
+        if not self.correct_answer:
+            return True  # No answer configured
+        return self.normalize_answer(submitted_answer) == self.normalize_answer(self.correct_answer)
+
 
 class Score(models.Model):
     leaderboard = models.ForeignKey(Leaderboard, on_delete=models.CASCADE, related_name='scores')
     player_name = models.CharField(max_length=50)
     player_id = models.CharField(max_length=100, null=True)
-    score = models.BigIntegerField()
+    score = models.BigIntegerField(null=True, blank=True, default=0)
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -155,6 +155,73 @@ class LeaderboardViewTest(TestCase):
         self.assertEqual(Score.objects.filter(leaderboard=self.leaderboard).count(), 1)
 
 
+class LeaderboardCreateViewTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.game = Game.objects.create(owner=self.user, name='Test Game')
+        self.client.login(username='test@example.com', password='testpass123')
+
+    def test_create_score_leaderboard(self):
+        """Test creating a standard score-based leaderboard"""
+        response = self.client.post(
+            reverse('leaderboards:leaderboard_create', kwargs={'game_slug': self.game.slug}),
+            {'name': 'High Scores', 'leaderboard_type': 'score', 'sort_order': 'desc'}
+        )
+        self.assertRedirects(response, reverse('games:game_detail', kwargs={'slug': self.game.slug}))
+        self.assertTrue(Leaderboard.objects.filter(name='High Scores').exists())
+
+    def test_create_correct_answer_leaderboard(self):
+        """Test creating a correct-answer leaderboard with answer"""
+        response = self.client.post(
+            reverse('leaderboards:leaderboard_create', kwargs={'game_slug': self.game.slug}),
+            {
+                'name': 'Puzzle Board',
+                'leaderboard_type': 'correct_answer',
+                'correct_answer': 'the answer',
+                'sort_order': 'newest'
+            }
+        )
+        self.assertRedirects(response, reverse('games:game_detail', kwargs={'slug': self.game.slug}))
+        leaderboard = Leaderboard.objects.get(name='Puzzle Board')
+        self.assertEqual(leaderboard.leaderboard_type, 'correct_answer')
+        self.assertEqual(leaderboard.correct_answer, 'the answer')
+
+    def test_create_correct_answer_leaderboard_requires_answer(self):
+        """Test that correct_answer type requires the answer field"""
+        response = self.client.post(
+            reverse('leaderboards:leaderboard_create', kwargs={'game_slug': self.game.slug}),
+            {
+                'name': 'Puzzle Board',
+                'leaderboard_type': 'correct_answer',
+                'sort_order': 'newest'
+            }
+        )
+        # Should redirect but NOT create the leaderboard
+        self.assertRedirects(response, reverse('games:game_detail', kwargs={'slug': self.game.slug}))
+        self.assertFalse(Leaderboard.objects.filter(name='Puzzle Board').exists())
+
+    def test_create_leaderboard_with_display_options(self):
+        """Test creating leaderboard with display options"""
+        response = self.client.post(
+            reverse('leaderboards:leaderboard_create', kwargs={'game_slug': self.game.slug}),
+            {
+                'name': 'Custom Board',
+                'leaderboard_type': 'score',
+                'sort_order': 'desc',
+                'show_score': False,
+                'show_date': True
+            }
+        )
+        self.assertRedirects(response, reverse('games:game_detail', kwargs={'slug': self.game.slug}))
+        leaderboard = Leaderboard.objects.get(name='Custom Board')
+        self.assertFalse(leaderboard.show_score)
+        self.assertTrue(leaderboard.show_date)
+
+
 class PublicLeaderboardViewTest(TestCase):
     def setUp(self):
         self.client = Client()

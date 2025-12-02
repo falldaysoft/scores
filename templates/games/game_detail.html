@@ -113,7 +113,7 @@
                  class="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6">
                 <h3 class="text-xl font-semibold text-gray-900 mb-4">New Leaderboard</h3>
 
-                <form method="post" action="{% url 'leaderboards:leaderboard_create' game_slug=game.slug %}">
+                <form method="post" action="{% url 'leaderboards:leaderboard_create' game_slug=game.slug %}" x-data="{ leaderboardType: 'score' }">
                     {% csrf_token %}
 
                     <div class="space-y-4">
@@ -128,10 +128,36 @@
                         </div>
 
                         <div>
+                            <label for="id_leaderboard_type" class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                            {{ leaderboard_form.leaderboard_type }}
+                            <p class="mt-1 text-xs text-gray-500">Score: traditional high scores. Correct Answer: puzzle/riddle requiring answer.</p>
+                        </div>
+
+                        <div x-show="leaderboardType === 'correct_answer'" x-transition>
+                            <label for="id_correct_answer" class="block text-sm font-medium text-gray-700 mb-1">Correct Answer</label>
+                            {{ leaderboard_form.correct_answer }}
+                            <p class="mt-1 text-xs text-gray-500">Case/whitespace/punctuation insensitive</p>
+                        </div>
+
+                        <div>
                             <label for="id_sort_order" class="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
                             {{ leaderboard_form.sort_order }}
                             <p class="mt-1 text-xs text-gray-500">Choose "Highest First" for most games, "Lowest First" for time-based scores</p>
                         </div>
+
+                        <fieldset class="border border-gray-200 rounded-lg p-4">
+                            <legend class="text-sm font-medium text-gray-700 px-2">Display Options</legend>
+                            <div class="space-y-3">
+                                <div class="flex items-center">
+                                    {{ leaderboard_form.show_score }}
+                                    <label for="id_show_score" class="ml-2 text-sm text-gray-700">Show score column</label>
+                                </div>
+                                <div class="flex items-center">
+                                    {{ leaderboard_form.show_date }}
+                                    <label for="id_show_date" class="ml-2 text-sm text-gray-700">Show date column</label>
+                                </div>
+                            </div>
+                        </fieldset>
                     </div>
 
                     <div class="mt-6 flex gap-3 justify-end">

@@ -26,8 +26,12 @@
                 <tr>
                     <th class="py-4 px-6 text-left text-sm font-semibold text-gray-900">Rank</th>
                     <th class="py-4 px-6 text-left text-sm font-semibold text-gray-900">Player</th>
+                    {% if leaderboard.show_score %}
                     <th class="py-4 px-6 text-right text-sm font-semibold text-gray-900">Score</th>
+                    {% endif %}
+                    {% if leaderboard.show_date %}
                     <th class="py-4 px-6 text-right text-sm font-semibold text-gray-900">Date</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody class="divide-y divide-gray-100">
@@ -45,10 +49,14 @@
                         {% endif %}
                     </td>
                     <td class="py-4 px-6 font-medium text-gray-900">{{ score.player_name }}</td>
+                    {% if leaderboard.show_score %}
                     <td class="py-4 px-6 text-right font-mono text-lg {% if forloop.counter <= 3 %}font-bold text-gray-900{% else %}text-gray-700{% endif %}">
                         {{ score.score|floatformat:0 }}
                     </td>
-                    <td class="py-4 px-6 text-right text-sm text-gray-500">{{ score.created_at|timesince }} ago</td>
+                    {% endif %}
+                    {% if leaderboard.show_date %}
+                    <td class="py-4 px-6 text-right text-sm text-gray-500 local-time" data-utc="{{ score.created_at|date:'c' }}">{{ score.created_at|timesince }} ago</td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
@@ -69,4 +77,13 @@
         </p>
     </div>
 </div>
+
+<script>
+document.querySelectorAll('.local-time').forEach(el => {
+    const utc = el.dataset.utc;
+    if (utc) {
+        el.title = new Date(utc).toLocaleString();
+    }
+});
+</script>
 {% endblock %}

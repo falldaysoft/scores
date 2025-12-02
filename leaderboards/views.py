@@ -31,6 +31,10 @@ class LeaderboardDetailView(LoginRequiredMixin, View):
         scores = leaderboard.scores.filter(expires_at__gt=timezone.now())
         if leaderboard.sort_order == 'asc':
             scores = scores.order_by('score')
+        elif leaderboard.sort_order == 'newest':
+            scores = scores.order_by('-created_at')
+        elif leaderboard.sort_order == 'oldest':
+            scores = scores.order_by('created_at')
         else:
             scores = scores.order_by('-score')
         return render(request, 'leaderboards/leaderboard_detail.html', {
@@ -128,6 +132,10 @@ class PublicLeaderboardView(View):
         scores = leaderboard.scores.filter(expires_at__gt=timezone.now())
         if leaderboard.sort_order == 'asc':
             scores = scores.order_by('score')
+        elif leaderboard.sort_order == 'newest':
+            scores = scores.order_by('-created_at')
+        elif leaderboard.sort_order == 'oldest':
+            scores = scores.order_by('created_at')
         else:
             scores = scores.order_by('-score')
         return render(request, 'leaderboards/public_leaderboard.html', {
