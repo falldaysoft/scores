@@ -10,4 +10,5 @@ urlpatterns = [
     path('target/', views.TargetGameView.as_view(), name='target'),
     path('whack/', views.WhackGameView.as_view(), name='whack'),
     path('snowflakes/', views.SnowflakeGameView.as_view(), name='snowflakes'),
+    path('riddle/', views.RiddleGameView.as_view(), name='riddle'),
 ]

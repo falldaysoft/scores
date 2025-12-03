@@ -29,3 +29,8 @@ class WhackGameView(TemplateView):
 class SnowflakeGameView(TemplateView):
     """Standalone page for Snowflake Catcher game"""
     template_name = 'minigames/snowflakes.html'
+
+
+class RiddleGameView(TemplateView):
+    """Standalone page for Riddle game (correct_answer type)"""
+    template_name = 'minigames/riddle.html'

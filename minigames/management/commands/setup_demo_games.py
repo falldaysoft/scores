@@ -12,6 +12,7 @@ DEMO_API_TOKENS = {
     'target-shooting': 'demo_target_shooting_public_token_v1',
     'whack-a-mole': 'demo_whack_a_mole_public_token_v1',
     'snowflakes': 'demo_snowflakes_public_token_v1',
+    'daily-riddle': 'demo_daily_riddle_public_token_v1',
 }
 
 
@@ -53,6 +54,14 @@ class Command(BaseCommand):
             'description': 'Catch falling snowflakes before they hit the ground! Smaller = more points.',
             'sort_order': 'desc',  # Higher score = better
         },
+        {
+            'name': 'Daily Riddle',
+            'slug': 'daily-riddle',
+            'description': 'Solve the riddle to join the leaderboard!',
+            'sort_order': 'newest',  # Show most recent solvers first
+            'leaderboard_type': 'correct_answer',
+            'correct_answer': 'map',
+        },
     ]
 
     def handle(self, *args, **options):
@@ -88,14 +97,21 @@ class Command(BaseCommand):
         # Create leaderboards with fixed API tokens
         for lb_config in self.LEADERBOARDS:
             fixed_token = DEMO_API_TOKENS[lb_config['slug']]
+            defaults = {
+                'name': lb_config['name'],
+                'description': lb_config['description'],
+                'sort_order': lb_config['sort_order'],
+            }
+            # Add optional fields for correct_answer leaderboards
+            if 'leaderboard_type' in lb_config:
+                defaults['leaderboard_type'] = lb_config['leaderboard_type']
+            if 'correct_answer' in lb_config:
+                defaults['correct_answer'] = lb_config['correct_answer']
+
             leaderboard, created = Leaderboard.objects.get_or_create(
                 game=game,
                 slug=lb_config['slug'],
-                defaults={
-                    'name': lb_config['name'],
-                    'description': lb_config['description'],
-                    'sort_order': lb_config['sort_order'],
-                }
+                defaults=defaults
             )
             if created:
                 # Set the fixed token (bypassing the auto-generated one)

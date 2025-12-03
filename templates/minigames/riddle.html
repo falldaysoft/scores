@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+
+{% block title %}Daily Riddle{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-amber-900 via-orange-900 to-amber-800 min-h-screen py-12">
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-8">
+            <a href="{% url 'minigames:play' %}" class="text-amber-300 hover:text-white transition">&larr; Back to games</a>
+            <h1 class="text-4xl font-bold text-white mt-4 mb-2">Daily Riddle</h1>
+            <p class="text-amber-200">Solve the riddle to join the leaderboard!</p>
+        </div>
+
+        <div x-data="riddleGame()" class="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <!-- Riddle Display -->
+            <div class="text-center mb-8">
+                <div class="bg-white/5 rounded-xl p-8 border border-white/10">
+                    <div class="text-6xl mb-6">🤔</div>
+                    <p class="text-xl text-white leading-relaxed italic">
+                        "I have cities, but no houses live there.<br>
+                        I have mountains, but no trees grow there.<br>
+                        I have water, but no fish swim there.<br>
+                        I have roads, but no cars drive there.<br>
+                        <span class="text-amber-300 font-bold">What am I?"</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Answer Form (not yet solved) -->
+            <div x-show="state === 'ready'" x-cloak>
+                <form @submit.prevent="submitAnswer()" class="space-y-4">
+                    <div>
+                        <label for="answer" class="block text-amber-200 text-sm mb-2">Your Answer (one word)</label>
+                        <input
+                            type="text"
+                            id="answer"
+                            x-model="answer"
+                            placeholder="Type your answer..."
+                            maxlength="50"
+                            required
+                            autocomplete="off"
+                            class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500 text-center text-xl"
+                        >
+                    </div>
+                    <div>
+                        <label for="playerName" class="block text-amber-200 text-sm mb-2">Your Name</label>
+                        <input
+                            type="text"
+                            id="playerName"
+                            x-model="playerName"
+                            placeholder="Enter your name"
+                            maxlength="50"
+                            required
+                            class="w-full px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500 text-center"
+                        >
+                    </div>
+                    <button
+                        type="submit"
+                        class="w-full px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition text-lg"
+                    >
+                        Submit Answer
+                    </button>
+                </form>
+            </div>
+
+            <!-- Submitting State -->
+            <div x-show="state === 'submitting'" x-cloak class="text-center text-white py-8">
+                <div class="text-4xl mb-4 animate-pulse">🔮</div>
+                <p class="text-xl">Checking your answer...</p>
+            </div>
+
+            <!-- Wrong Answer -->
+            <div x-show="state === 'wrong'" x-cloak class="text-center py-8">
+                <div class="text-6xl mb-4">❌</div>
+                <p class="text-2xl text-red-400 font-bold mb-2">That's not it!</p>
+                <p class="text-amber-200 mb-6">Think harder... the answer is a single common word.</p>
+                <button @click="tryAgain()" class="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition">
+                    Try Again
+                </button>
+            </div>
+
+            <!-- Correct Answer -->
+            <div x-show="state === 'correct'" x-cloak class="text-center py-8">
+                <div class="text-6xl mb-4">🎉</div>
+                <p class="text-3xl text-green-400 font-bold mb-2">Correct!</p>
+                <p class="text-amber-200 mb-6">You solved the riddle and joined the leaderboard!</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='daily-riddle' %}" class="px-6 py-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition text-center">
+                        View Leaderboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div x-show="error && state === 'ready'" x-cloak class="mt-4 text-center">
+                <p class="text-red-400" x-text="error"></p>
+            </div>
+        </div>
+
+        <!-- Leaderboard Preview -->
+        <div class="mt-8 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <h2 class="text-xl font-bold text-white mb-4">Solvers</h2>
+            <div id="leaderboard" x-data="leaderboardPreview('mini-games', 'daily-riddle')" x-init="fetchScores()">
+                <div x-show="loading" class="text-amber-200">Loading...</div>
+                <div x-show="!loading && scores.length === 0" class="text-amber-200">No one has solved this yet. Be the first!</div>
+                <ul x-show="!loading && scores.length > 0" class="space-y-2">
+                    <template x-for="(s, i) in scores" :key="i">
+                        <li class="flex justify-between items-center py-2 px-4 rounded-lg" :class="i < 3 ? 'bg-white/10' : ''">
+                            <div class="flex items-center gap-3">
+                                <span class="text-amber-300 font-mono w-6" x-text="'#' + s.rank"></span>
+                                <span class="text-white" x-text="s.player_name"></span>
+                            </div>
+                            <span class="text-amber-400 text-sm" x-text="formatDate(s.created_at)"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Leaderboard Link -->
+        <p class="mt-4 text-center text-amber-300 text-sm">
+            <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='daily-riddle' %}" class="hover:text-white transition underline">View full leaderboard</a>
+        </p>
+    </div>
+</div>
+
+<script>
+function riddleGame() {
+    return {
+        state: 'ready', // ready, submitting, correct, wrong
+        answer: '',
+        playerName: '',
+        error: null,
+        apiToken: 'demo_daily_riddle_public_token_v1',
+
+        async submitAnswer() {
+            if (!this.answer.trim() || !this.playerName.trim()) return;
+
+            this.state = 'submitting';
+            this.error = null;
+
+            try {
+                const response = await fetch('/api/v1/scores/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + this.apiToken
+                    },
+                    body: JSON.stringify({
+                        player_name: this.playerName.trim(),
+                        answer: this.answer.trim()
+                    })
+                });
+
+                if (response.ok) {
+                    this.state = 'correct';
+                    // Refresh leaderboard
+                    const leaderboardEl = document.querySelector('#leaderboard');
+                    if (leaderboardEl && leaderboardEl._x_dataStack) {
+                        leaderboardEl._x_dataStack[0].fetchScores();
+                    }
+                } else {
+                    const data = await response.json();
+                    if (data.error === 'Incorrect answer') {
+                        this.state = 'wrong';
+                    } else {
+                        this.error = data.error || 'Failed to submit answer';
+                        this.state = 'ready';
+                    }
+                }
+            } catch (e) {
+                this.error = 'Network error. Please try again.';
+                this.state = 'ready';
+            }
+        },
+
+        tryAgain() {
+            this.state = 'ready';
+            this.answer = '';
+            this.error = null;
+        }
+    };
+}
+
+function leaderboardPreview(gameSlug, leaderboardSlug) {
+    return {
+        scores: [],
+        loading: true,
+
+        async fetchScores() {
+            this.loading = true;
+            try {
+                const response = await fetch(`/api/v1/scores/${gameSlug}/${leaderboardSlug}/?limit=10`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.scores = data.scores;
+                }
+            } catch (e) {
+                console.error('Failed to fetch scores:', e);
+            }
+            this.loading = false;
+        },
+
+        formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString();
+        }
+    };
+}
+</script>
+{% endblock %}
