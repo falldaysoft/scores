@@ -27,8 +27,8 @@ class ScoreAPITest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data['player_name'], 'Player1')
-        self.assertEqual(response.data['score'], 1000)
+        self.assertTrue(response.data['success'])
+        self.assertEqual(response.data['message'], 'Score submitted successfully')
         self.assertTrue(Score.objects.filter(player_name='Player1').exists())
 
     def test_submit_score_with_metadata(self):
@@ -56,6 +56,7 @@ class ScoreAPITest(TestCase):
             format='json'
         )
         self.assertEqual(response.status_code, 401)
+        self.assertFalse(response.data['success'])
 
     def test_submit_score_invalid_token(self):
         response = self.client.post(
@@ -68,6 +69,7 @@ class ScoreAPITest(TestCase):
             HTTP_AUTHORIZATION='Bearer invalid-token'
         )
         self.assertEqual(response.status_code, 401)
+        self.assertFalse(response.data['success'])
 
     def test_submit_score_missing_player_name(self):
         response = self.client.post(
@@ -79,6 +81,7 @@ class ScoreAPITest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data['success'])
         self.assertIn('player_name', response.data['error'])
 
     def test_submit_score_missing_score(self):
@@ -91,6 +94,7 @@ class ScoreAPITest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data['success'])
         self.assertIn('score', response.data['error'])
 
     def test_submit_score_invalid_score_type(self):
@@ -104,6 +108,7 @@ class ScoreAPITest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data['success'])
 
     def test_submit_score_player_name_too_long(self):
         response = self.client.post(
@@ -116,6 +121,7 @@ class ScoreAPITest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data['success'])
 
     def test_get_scores(self):
         Score.objects.create(leaderboard=self.leaderboard, player_name='Player1', score=1000)
@@ -154,6 +160,7 @@ class ScoreAPITest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data['success'])
         self.assertEqual(Score.objects.count(), 1)
         score = Score.objects.first()
         self.assertEqual(score.player_id, 'user-123')
@@ -185,6 +192,7 @@ class ScoreAPITest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 200)  # 200 for update, not 201
+        self.assertTrue(response.data['success'])
         self.assertEqual(Score.objects.count(), 1)  # Still only one score
         score = Score.objects.first()
         self.assertEqual(score.player_name, 'Player1 Updated')
@@ -338,6 +346,7 @@ class CorrectAnswerLeaderboardTest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data['success'])
         self.assertEqual(Score.objects.count(), 1)
         self.assertEqual(Score.objects.first().score, 0)
 
@@ -350,6 +359,7 @@ class CorrectAnswerLeaderboardTest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data['success'])
         self.assertEqual(Score.objects.first().score, 5000)
 
     def test_submit_wrong_answer(self):
@@ -361,6 +371,7 @@ class CorrectAnswerLeaderboardTest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data['success'])
         self.assertIn('Incorrect answer', response.data['error'])
         self.assertEqual(Score.objects.count(), 0)
 
@@ -373,6 +384,7 @@ class CorrectAnswerLeaderboardTest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data['success'])
         self.assertIn('answer is required', response.data['error'])
 
     def test_answer_case_insensitive(self):
@@ -384,6 +396,7 @@ class CorrectAnswerLeaderboardTest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data['success'])
 
     def test_answer_whitespace_insensitive(self):
         """Test that answer comparison ignores extra whitespace"""
@@ -394,6 +407,7 @@ class CorrectAnswerLeaderboardTest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data['success'])
 
     def test_answer_punctuation_insensitive(self):
         """Test that answer comparison ignores punctuation"""
@@ -404,6 +418,7 @@ class CorrectAnswerLeaderboardTest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data['success'])
 
     def test_answer_combined_normalization(self):
         """Test that all normalizations work together"""
@@ -414,6 +429,7 @@ class CorrectAnswerLeaderboardTest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {self.puzzle_leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data['success'])
 
     def test_standard_leaderboard_requires_score(self):
         """Test that standard leaderboards still require score"""
@@ -429,6 +445,7 @@ class CorrectAnswerLeaderboardTest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {standard_leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.data['success'])
         self.assertIn('score is required', response.data['error'])
 
     def test_standard_leaderboard_ignores_answer(self):
@@ -445,6 +462,7 @@ class CorrectAnswerLeaderboardTest(TestCase):
             HTTP_AUTHORIZATION=f'Bearer {standard_leaderboard.api_token}'
         )
         self.assertEqual(response.status_code, 201)
+        self.assertTrue(response.data['success'])
 
     def test_get_response_includes_leaderboard_type(self):
         """Test that GET response includes leaderboard type and display settings"""

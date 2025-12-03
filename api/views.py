@@ -19,7 +19,7 @@ class ScoreAPIView(APIView):
         leaderboard = self.get_leaderboard(request)
         if not leaderboard:
             return Response(
-                {'error': 'Invalid or missing API token'},
+                {'success': False, 'error': 'Invalid or missing API token'},
                 status=status.HTTP_401_UNAUTHORIZED
             )
 
@@ -33,13 +33,13 @@ class ScoreAPIView(APIView):
 
         if not player_name:
             return Response(
-                {'error': 'player_name is required'},
+                {'success': False, 'error': 'player_name is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         if len(player_name) > 50:
             return Response(
-                {'error': 'player_name must be 50 characters or less'},
+                {'success': False, 'error': 'player_name must be 50 characters or less'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -47,12 +47,12 @@ class ScoreAPIView(APIView):
         if leaderboard.leaderboard_type == 'correct_answer':
             if not answer:
                 return Response(
-                    {'error': 'answer is required for this leaderboard'},
+                    {'success': False, 'error': 'answer is required for this leaderboard'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             if not leaderboard.check_answer(answer):
                 return Response(
-                    {'error': 'Incorrect answer'},
+                    {'success': False, 'error': 'Incorrect answer'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             # Score is optional for correct_answer leaderboards
@@ -62,7 +62,7 @@ class ScoreAPIView(APIView):
             # Standard leaderboard requires score
             if score_value is None:
                 return Response(
-                    {'error': 'score is required'},
+                    {'success': False, 'error': 'score is required'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -70,13 +70,13 @@ class ScoreAPIView(APIView):
             score_value = int(score_value)
         except (ValueError, TypeError):
             return Response(
-                {'error': 'score must be an integer'},
+                {'success': False, 'error': 'score must be an integer'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
         if not isinstance(metadata, dict):
             return Response(
-                {'error': 'metadata must be an object'},
+                {'success': False, 'error': 'metadata must be an object'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -107,12 +107,8 @@ class ScoreAPIView(APIView):
             created = True
 
         return Response({
-            'id': score.id,
-            'player_name': score.player_name,
-            'score': score.score,
-            'created_at': score.created_at.isoformat(),
-            'updated_at': score.updated_at.isoformat(),
-            'expires_at': score.expires_at.isoformat(),
+            'success': True,
+            'message': 'Score submitted successfully',
         }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def get(self, request):

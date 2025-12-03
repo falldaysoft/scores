@@ -71,6 +71,7 @@
             <!-- Code Examples -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6" x-data="{ tab: 'javascript' }">
                 <h2 class="text-lg font-semibold text-gray-900 mb-4">Integration Code</h2>
+                <p class="text-sm text-gray-500 mb-4">A 200/201 status indicates success; 400 indicates an error. You can check the status code without parsing the response body.</p>
 
                 <!-- Tab buttons -->
                 <div class="flex gap-2 mb-4 border-b border-gray-200">
@@ -103,7 +104,10 @@
     },
     body: JSON.stringify(body)
   });
-  return response.json();
+  const data = await response.json();
+  // Returns: { success: true, message: "Score submitted successfully" }
+  // Or error: { success: false, error: "Error message" }
+  return data;
 }
 
 // Submit answer only (score defaults to 0)
@@ -127,7 +131,10 @@ submitAnswer('Player1', 'the answer', 5432, 'unique-player-id');</code></pre>
     },
     body: JSON.stringify(body)
   });
-  return response.json();
+  const data = await response.json();
+  // Returns: { success: true, message: "Score submitted successfully" }
+  // Or error: { success: false, error: "Error message" }
+  return data;
 }
 
 // Without player_id: creates a new score each time
@@ -183,6 +190,8 @@ def submit_answer(player_name, answer, score=None, player_id=None):
         },
         json=data
     )
+    # Returns: {'success': True, 'message': 'Score submitted successfully'}
+    # Or error: {'success': False, 'error': 'Error message'}
     return response.json()
 
 # Submit answer only (score defaults to 0)
@@ -208,6 +217,8 @@ def submit_score(player_name, score, player_id=None):
         },
         json=data
     )
+    # Returns: {'success': True, 'message': 'Score submitted successfully'}
+    # Or error: {'success': False, 'error': 'Error message'}
     return response.json()
 
 # Without player_id: creates a new score each time
@@ -251,6 +262,8 @@ curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {{ leaderboard.api_token }}" \
   -d '{"player_name": "Player1", "answer": "the answer"}'
+# Returns: {"success": true, "message": "Score submitted successfully"}
+# Or error: {"success": false, "error": "Error message"}
 
 # Submit answer with time score
 curl -X POST {{ site_url }}/api/v1/scores/ \
@@ -269,6 +282,8 @@ curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {{ leaderboard.api_token }}" \
   -d '{"player_name": "Player1", "score": 42000}'
+# Returns: {"success": true, "message": "Score submitted successfully"}
+# Or error: {"success": false, "error": "Error message"}
 
 # With player_id: one score per player (updates if exists)
 curl -X POST {{ site_url }}/api/v1/scores/ \
