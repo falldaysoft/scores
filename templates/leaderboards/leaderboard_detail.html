@@ -105,7 +105,7 @@
     body: JSON.stringify(body)
   });
   const data = await response.json();
-  // Returns: { success: true, message: "Score submitted successfully" }
+  // Returns: { success: true, message: "...", is_high_score: true/false }
   // Or error: { success: false, error: "Error message" }
   return data;
 }
@@ -116,7 +116,7 @@ submitAnswer('Player1', 'the answer');
 // Submit answer with time score (e.g., milliseconds to solve)
 submitAnswer('Player1', 'the answer', 5432);
 
-// With player_id: one entry per player (updates if exists)
+// With player_id: one entry per player (updates only if better)
 submitAnswer('Player1', 'the answer', 5432, 'unique-player-id');</code></pre>
                         {% else %}
                         <pre id="js-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>async function submitScore(playerName, score, playerId = null) {
@@ -132,7 +132,7 @@ submitAnswer('Player1', 'the answer', 5432, 'unique-player-id');</code></pre>
     body: JSON.stringify(body)
   });
   const data = await response.json();
-  // Returns: { success: true, message: "Score submitted successfully" }
+  // Returns: { success: true, message: "...", is_high_score: true/false }
   // Or error: { success: false, error: "Error message" }
   return data;
 }
@@ -140,7 +140,7 @@ submitAnswer('Player1', 'the answer', 5432, 'unique-player-id');</code></pre>
 // Without player_id: creates a new score each time
 submitScore('Player1', 42000);
 
-// With player_id: one score per player (updates if exists)
+// With player_id: one score per player (updates only if better)
 submitScore('Player1', 42000, 'unique-player-id');</code></pre>
                         {% endif %}
                     </div>
@@ -190,7 +190,7 @@ def submit_answer(player_name, answer, score=None, player_id=None):
         },
         json=data
     )
-    # Returns: {'success': True, 'message': 'Score submitted successfully'}
+    # Returns: {'success': True, 'message': '...', 'is_high_score': True/False}
     # Or error: {'success': False, 'error': 'Error message'}
     return response.json()
 
@@ -200,7 +200,7 @@ submit_answer('Player1', 'the answer')
 # Submit answer with time score (e.g., milliseconds to solve)
 submit_answer('Player1', 'the answer', 5432)
 
-# With player_id: one entry per player (updates if exists)
+# With player_id: one entry per player (updates only if better)
 submit_answer('Player1', 'the answer', 5432, 'unique-player-id')</code></pre>
                         {% else %}
                         <pre id="py-submit" class="bg-gray-900 text-gray-100 p-4 rounded-lg text-sm overflow-x-auto"><code>import requests
@@ -217,14 +217,14 @@ def submit_score(player_name, score, player_id=None):
         },
         json=data
     )
-    # Returns: {'success': True, 'message': 'Score submitted successfully'}
+    # Returns: {'success': True, 'message': '...', 'is_high_score': True/False}
     # Or error: {'success': False, 'error': 'Error message'}
     return response.json()
 
 # Without player_id: creates a new score each time
 submit_score('Player1', 42000)
 
-# With player_id: one score per player (updates if exists)
+# With player_id: one score per player (updates only if better)
 submit_score('Player1', 42000, 'unique-player-id')</code></pre>
                         {% endif %}
                     </div>
@@ -262,7 +262,7 @@ curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {{ leaderboard.api_token }}" \
   -d '{"player_name": "Player1", "answer": "the answer"}'
-# Returns: {"success": true, "message": "Score submitted successfully"}
+# Returns: {"success": true, "message": "...", "is_high_score": true/false}
 # Or error: {"success": false, "error": "Error message"}
 
 # Submit answer with time score
@@ -271,7 +271,7 @@ curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Authorization: Bearer {{ leaderboard.api_token }}" \
   -d '{"player_name": "Player1", "answer": "the answer", "score": 5432}'
 
-# With player_id: one entry per player (updates if exists)
+# With player_id: one entry per player (updates only if better)
 curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {{ leaderboard.api_token }}" \
@@ -282,10 +282,10 @@ curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {{ leaderboard.api_token }}" \
   -d '{"player_name": "Player1", "score": 42000}'
-# Returns: {"success": true, "message": "Score submitted successfully"}
+# Returns: {"success": true, "message": "...", "is_high_score": true/false}
 # Or error: {"success": false, "error": "Error message"}
 
-# With player_id: one score per player (updates if exists)
+# With player_id: one score per player (updates only if better)
 curl -X POST {{ site_url }}/api/v1/scores/ \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer {{ leaderboard.api_token }}" \

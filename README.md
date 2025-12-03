@@ -73,12 +73,29 @@ curl -X POST http://scores.fallday.ca/api/v1/scores/ \
 
 ### Player ID
 
-The optional `player_id` field enables one-score-per-player mode:
+The optional `player_id` field enables one-score-per-player:
 
 - **Without `player_id`**: Every submission creates a new score entry
-- **With `player_id`**: If a score exists for that player on the leaderboard, it's updated; otherwise a new score is created
+- **With `player_id`**: If a score exists for that player on the leaderboard, it's updated only if the new score is better; otherwise the existing score is kept
+
+"Better" depends on the leaderboard's sort order: higher is better for `desc`, lower is better for `asc`.
 
 Use any unique identifier for your players: a device UUID, Steam ID, Game Centre ID, or your own user ID. The `player_id` is never exposed in API responses to prevent players from overwriting others' scores.
+
+### Response
+
+The API response includes an `is_high_score` boolean indicating whether the submitted score was recorded:
+
+```json
+{
+  "success": true,
+  "message": "Score submitted successfully",
+  "is_high_score": true
+}
+```
+
+- `is_high_score: true` - New score created or existing score was beaten
+- `is_high_score: false` - Existing score was better and kept (only when using `player_id`)
 
 ## Tech Stack
 

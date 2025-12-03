@@ -82,20 +82,42 @@ class ScoreAPIView(APIView):
 
         # If player_id provided, update existing score or create new one
         created = False
+        updated = False
         if player_id:
-            score = Score.objects.filter(
+            existing_score = Score.objects.filter(
                 leaderboard=leaderboard,
                 player_id=player_id
             ).first()
         else:
-            score = None
+            existing_score = None
 
-        if score:
-            score.player_name = player_name
-            score.score = score_value
-            score.metadata = metadata
-            score.expires_at = None  # Will be recalculated on save
-            score.save()
+        if existing_score:
+            # Determine if the new score is better based on sort order
+            is_better = False
+            if leaderboard.sort_order == 'desc':
+                # Higher score is better
+                is_better = score_value > existing_score.score
+            elif leaderboard.sort_order == 'asc':
+                # Lower score is better
+                is_better = score_value < existing_score.score
+            elif leaderboard.sort_order == 'newest':
+                # Newer is better, always update
+                is_better = True
+            elif leaderboard.sort_order == 'oldest':
+                # Older is better, never update
+                is_better = False
+
+            if is_better:
+                existing_score.player_name = player_name
+                existing_score.score = score_value
+                existing_score.metadata = metadata
+                existing_score.expires_at = None  # Will be recalculated on save
+                existing_score.save()
+                updated = True
+                score = existing_score
+            else:
+                # Keep existing score, don't update
+                score = existing_score
         else:
             score = Score.objects.create(
                 leaderboard=leaderboard,
@@ -106,9 +128,17 @@ class ScoreAPIView(APIView):
             )
             created = True
 
+        if created:
+            message = 'Score submitted successfully'
+        elif updated:
+            message = 'Score updated successfully'
+        else:
+            message = 'Score not updated (existing score is better)'
+
         return Response({
             'success': True,
-            'message': 'Score submitted successfully',
+            'message': message,
+            'is_high_score': created or updated,
         }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     def get(self, request):

@@ -127,11 +127,28 @@
 </div>
 
 <script>
+function getPlayerId() {
+    let playerId = localStorage.getItem('scores_player_id');
+    if (!playerId) {
+        playerId = crypto.randomUUID();
+        localStorage.setItem('scores_player_id', playerId);
+    }
+    return playerId;
+}
+
+function getSavedPlayerName() {
+    return localStorage.getItem('scores_player_name') || '';
+}
+
+function savePlayerName(name) {
+    localStorage.setItem('scores_player_name', name);
+}
+
 function reactionGame() {
     return {
         state: 'ready', // ready, waiting, go, too_early, finished, submitting, submitted
         score: 0,
-        playerName: '',
+        playerName: getSavedPlayerName(),
         error: null,
         startTime: null,
         timeout: null,
@@ -172,6 +189,7 @@ function reactionGame() {
 
             this.state = 'submitting';
             this.error = null;
+            savePlayerName(this.playerName.trim());
 
             try {
                 const response = await fetch('/api/v1/scores/', {
@@ -182,7 +200,8 @@ function reactionGame() {
                     },
                     body: JSON.stringify({
                         player_name: this.playerName.trim(),
-                        score: this.score
+                        score: this.score,
+                        player_id: getPlayerId()
                     })
                 });
 

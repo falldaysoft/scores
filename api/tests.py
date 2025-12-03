@@ -198,6 +198,112 @@ class ScoreAPITest(TestCase):
         self.assertEqual(score.player_name, 'Player1 Updated')
         self.assertEqual(score.score, 2000)
 
+    def test_submit_score_with_player_id_does_not_update_if_worse_desc(self):
+        # For desc leaderboards (default), higher score is better
+        # First submission with high score
+        self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 2000
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+
+        # Second submission with lower score - should NOT update
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1 Updated',
+                'player_id': 'user-123',
+                'score': 1000
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['success'])
+        self.assertIn('not updated', response.data['message'])
+        self.assertFalse(response.data['is_high_score'])
+        self.assertEqual(Score.objects.count(), 1)
+        score = Score.objects.first()
+        self.assertEqual(score.player_name, 'Player1')  # Name not updated
+        self.assertEqual(score.score, 2000)  # Score kept original
+
+    def test_submit_score_with_player_id_updates_if_better_asc(self):
+        # For asc leaderboards, lower score is better
+        self.leaderboard.sort_order = 'asc'
+        self.leaderboard.save()
+
+        # First submission with high score
+        self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 2000
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+
+        # Second submission with lower score - should update
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1 Updated',
+                'player_id': 'user-123',
+                'score': 1000
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['success'])
+        self.assertIn('updated', response.data['message'])
+        self.assertTrue(response.data['is_high_score'])
+        score = Score.objects.first()
+        self.assertEqual(score.player_name, 'Player1 Updated')
+        self.assertEqual(score.score, 1000)
+
+    def test_submit_score_with_player_id_does_not_update_if_worse_asc(self):
+        # For asc leaderboards, lower score is better
+        self.leaderboard.sort_order = 'asc'
+        self.leaderboard.save()
+
+        # First submission with low score
+        self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 1000
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+
+        # Second submission with higher score - should NOT update
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1 Updated',
+                'player_id': 'user-123',
+                'score': 2000
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['success'])
+        self.assertIn('not updated', response.data['message'])
+        self.assertFalse(response.data['is_high_score'])
+        score = Score.objects.first()
+        self.assertEqual(score.player_name, 'Player1')  # Name not updated
+        self.assertEqual(score.score, 1000)  # Score kept original
+
     def test_submit_score_without_player_id_always_creates(self):
         # Two submissions without player_id should create two scores
         self.client.post(

@@ -124,6 +124,23 @@
 </div>
 
 <script>
+function getPlayerId() {
+    let playerId = localStorage.getItem('scores_player_id');
+    if (!playerId) {
+        playerId = crypto.randomUUID();
+        localStorage.setItem('scores_player_id', playerId);
+    }
+    return playerId;
+}
+
+function getSavedPlayerName() {
+    return localStorage.getItem('scores_player_name') || '';
+}
+
+function savePlayerName(name) {
+    localStorage.setItem('scores_player_name', name);
+}
+
 function memoryGame() {
     return {
         state: 'ready', // ready, showing, input, correct, wrong
@@ -133,7 +150,7 @@ function memoryGame() {
         playerSequence: [],
         colors: ['red', 'blue', 'green', 'yellow'],
         activeColor: null,
-        playerName: '',
+        playerName: getSavedPlayerName(),
         error: null,
         submitting: false,
         submitted: false,
@@ -198,6 +215,7 @@ function memoryGame() {
 
             this.submitting = true;
             this.error = null;
+            savePlayerName(this.playerName.trim());
 
             try {
                 const response = await fetch('/api/v1/scores/', {
@@ -208,7 +226,8 @@ function memoryGame() {
                     },
                     body: JSON.stringify({
                         player_name: this.playerName.trim(),
-                        score: this.score
+                        score: this.score,
+                        player_id: getPlayerId()
                     })
                 });
 

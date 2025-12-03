@@ -125,11 +125,28 @@
 </div>
 
 <script>
+function getPlayerId() {
+    let playerId = localStorage.getItem('scores_player_id');
+    if (!playerId) {
+        playerId = crypto.randomUUID();
+        localStorage.setItem('scores_player_id', playerId);
+    }
+    return playerId;
+}
+
+function getSavedPlayerName() {
+    return localStorage.getItem('scores_player_name') || '';
+}
+
+function savePlayerName(name) {
+    localStorage.setItem('scores_player_name', name);
+}
+
 function riddleGame() {
     return {
         state: 'ready', // ready, submitting, correct, wrong
         answer: '',
-        playerName: '',
+        playerName: getSavedPlayerName(),
         error: null,
         apiToken: 'demo_daily_riddle_public_token_v1',
 
@@ -138,6 +155,7 @@ function riddleGame() {
 
             this.state = 'submitting';
             this.error = null;
+            savePlayerName(this.playerName.trim());
 
             try {
                 const response = await fetch('/api/v1/scores/', {
@@ -148,7 +166,8 @@ function riddleGame() {
                     },
                     body: JSON.stringify({
                         player_name: this.playerName.trim(),
-                        answer: this.answer.trim()
+                        answer: this.answer.trim(),
+                        player_id: getPlayerId()
                     })
                 });
 

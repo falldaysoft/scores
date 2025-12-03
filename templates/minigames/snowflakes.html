@@ -166,6 +166,23 @@
 </div>
 
 <script>
+function getPlayerId() {
+    let playerId = localStorage.getItem('scores_player_id');
+    if (!playerId) {
+        playerId = crypto.randomUUID();
+        localStorage.setItem('scores_player_id', playerId);
+    }
+    return playerId;
+}
+
+function getSavedPlayerName() {
+    return localStorage.getItem('scores_player_name') || '';
+}
+
+function savePlayerName(name) {
+    localStorage.setItem('scores_player_name', name);
+}
+
 function snowflakeGame() {
     return {
         state: 'ready', // ready, playing, finished, submitting, submitted
@@ -173,7 +190,7 @@ function snowflakeGame() {
         timeLeft: 30,
         caught: 0,
         missed: 0,
-        playerName: '',
+        playerName: getSavedPlayerName(),
         error: null,
         apiToken: 'demo_snowflakes_public_token_v1',
         snowflakes: [],
@@ -373,6 +390,7 @@ function snowflakeGame() {
 
             this.state = 'submitting';
             this.error = null;
+            savePlayerName(this.playerName.trim());
 
             try {
                 const response = await fetch('/api/v1/scores/', {
@@ -383,7 +401,8 @@ function snowflakeGame() {
                     },
                     body: JSON.stringify({
                         player_name: this.playerName.trim(),
-                        score: this.score
+                        score: this.score,
+                        player_id: getPlayerId()
                     })
                 });
 
