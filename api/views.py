@@ -128,6 +128,10 @@ class ScoreAPIView(APIView):
             )
             created = True
 
+        # Prune excess scores if we added a new one
+        if created:
+            leaderboard.prune_excess_scores()
+
         if created:
             message = 'Score submitted successfully'
         elif updated:

@@ -35,6 +35,8 @@ class Leaderboard(models.Model):
     correct_answer = models.CharField(max_length=64, blank=True, null=True)
     show_score = models.BooleanField(default=True)
     show_date = models.BooleanField(default=False)
+    min_scores_to_keep = models.PositiveIntegerField(default=10)
+    max_scores = models.PositiveIntegerField(default=1000)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -78,6 +80,37 @@ class Leaderboard(models.Model):
         if not self.correct_answer:
             return True  # No answer configured
         return self.normalize_answer(submitted_answer) == self.normalize_answer(self.correct_answer)
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        super().clean()
+        if self.min_scores_to_keep > self.max_scores:
+            raise ValidationError({'min_scores_to_keep': 'Cannot exceed max_scores.'})
+        if self.min_scores_to_keep > 100:
+            raise ValidationError({'min_scores_to_keep': 'Cannot exceed 100.'})
+        if self.max_scores > 10000:
+            raise ValidationError({'max_scores': 'Cannot exceed 10000.'})
+        if self.max_scores < 10:
+            raise ValidationError({'max_scores': 'Must be at least 10.'})
+
+    def get_score_ordering(self):
+        """Return the field to order scores by (best first)."""
+        if self.sort_order == 'asc':
+            return 'score'
+        elif self.sort_order == 'newest':
+            return '-created_at'
+        elif self.sort_order == 'oldest':
+            return 'created_at'
+        else:  # desc
+            return '-score'
+
+    def prune_excess_scores(self):
+        """Remove scores beyond max_scores limit, keeping best based on sort_order."""
+        order = self.get_score_ordering()
+        keep_ids = list(
+            self.scores.order_by(order).values_list('id', flat=True)[:self.max_scores]
+        )
+        return self.scores.exclude(id__in=keep_ids).delete()
 
 
 class Score(models.Model):

@@ -13,7 +13,7 @@ from .forms import LeaderboardForm
 class LeaderboardCreateView(LoginRequiredMixin, View):
     def post(self, request, game_slug):
         game = get_object_or_404(Game, slug=game_slug, owner=request.user)
-        form = LeaderboardForm(request.POST)
+        form = LeaderboardForm(request.POST, user=request.user)
         if form.is_valid():
             leaderboard = form.save(commit=False)
             leaderboard.game = game
@@ -48,7 +48,7 @@ class LeaderboardEditView(LoginRequiredMixin, View):
     def get(self, request, game_slug, leaderboard_slug):
         game = get_object_or_404(Game, slug=game_slug, owner=request.user)
         leaderboard = get_object_or_404(Leaderboard, slug=leaderboard_slug, game=game)
-        form = LeaderboardForm(instance=leaderboard)
+        form = LeaderboardForm(instance=leaderboard, user=request.user)
         if request.htmx:
             return render(request, 'leaderboards/partials/leaderboard_edit_form.html', {
                 'form': form, 'game': game, 'leaderboard': leaderboard
@@ -60,7 +60,7 @@ class LeaderboardEditView(LoginRequiredMixin, View):
     def post(self, request, game_slug, leaderboard_slug):
         game = get_object_or_404(Game, slug=game_slug, owner=request.user)
         leaderboard = get_object_or_404(Leaderboard, slug=leaderboard_slug, game=game)
-        form = LeaderboardForm(request.POST, instance=leaderboard)
+        form = LeaderboardForm(request.POST, instance=leaderboard, user=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, 'Leaderboard updated!')

@@ -254,3 +254,178 @@ class PublicLeaderboardViewTest(TestCase):
         }))
         self.assertContains(response, 'TopPlayer')
         self.assertContains(response, '5000')
+
+
+class RetentionPolicyTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.game = Game.objects.create(owner=self.user, name='Test Game')
+        self.leaderboard = Leaderboard.objects.create(
+            game=self.game,
+            name='Test Leaderboard',
+            min_scores_to_keep=3,
+            max_scores=10
+        )
+
+    def test_default_retention_values(self):
+        """Test that new leaderboards have default retention values"""
+        lb = Leaderboard.objects.create(game=self.game, name='Default Board')
+        self.assertEqual(lb.min_scores_to_keep, 10)
+        self.assertEqual(lb.max_scores, 1000)
+
+    def test_prune_excess_scores_desc(self):
+        """Test that prune_excess_scores keeps best scores for desc order"""
+        self.leaderboard.max_scores = 5
+        self.leaderboard.save()
+
+        # Create 8 scores (more than max_scores=5)
+        for i in range(8):
+            Score.objects.create(
+                leaderboard=self.leaderboard,
+                player_name=f'Player{i}',
+                score=i * 100
+            )
+
+        self.assertEqual(self.leaderboard.scores.count(), 8)
+        self.leaderboard.prune_excess_scores()
+        self.assertEqual(self.leaderboard.scores.count(), 5)
+
+        # Should keep the 5 highest scores (300, 400, 500, 600, 700)
+        remaining_scores = list(self.leaderboard.scores.order_by('-score').values_list('score', flat=True))
+        self.assertEqual(remaining_scores, [700, 600, 500, 400, 300])
+
+    def test_prune_excess_scores_asc(self):
+        """Test that prune_excess_scores keeps best scores for asc order (lower is better)"""
+        self.leaderboard.sort_order = 'asc'
+        self.leaderboard.max_scores = 3
+        self.leaderboard.save()
+
+        for i in range(5):
+            Score.objects.create(
+                leaderboard=self.leaderboard,
+                player_name=f'Player{i}',
+                score=i * 100
+            )
+
+        self.leaderboard.prune_excess_scores()
+        self.assertEqual(self.leaderboard.scores.count(), 3)
+
+        # Should keep lowest 3 scores (0, 100, 200)
+        remaining_scores = list(self.leaderboard.scores.order_by('score').values_list('score', flat=True))
+        self.assertEqual(remaining_scores, [0, 100, 200])
+
+    def test_cleanup_respects_min_scores_to_keep(self):
+        """Test that cleanup command preserves min_scores_to_keep even if expired"""
+        from django.core.management import call_command
+
+        # Create 5 expired scores
+        for i in range(5):
+            score = Score.objects.create(
+                leaderboard=self.leaderboard,
+                player_name=f'Player{i}',
+                score=i * 100
+            )
+            score.expires_at = timezone.now() - timedelta(days=1)
+            score.save()
+
+        self.assertEqual(self.leaderboard.scores.count(), 5)
+
+        # Run cleanup - should keep top 3 (min_scores_to_keep=3)
+        call_command('cleanup_expired_scores')
+
+        self.assertEqual(self.leaderboard.scores.count(), 3)
+        # Should keep highest 3 scores (200, 300, 400)
+        remaining_scores = list(self.leaderboard.scores.order_by('-score').values_list('score', flat=True))
+        self.assertEqual(remaining_scores, [400, 300, 200])
+
+    def test_cleanup_deletes_expired_beyond_min(self):
+        """Test that cleanup deletes expired scores beyond min_scores_to_keep"""
+        from django.core.management import call_command
+
+        # Create 3 active scores and 3 expired scores
+        for i in range(3):
+            Score.objects.create(
+                leaderboard=self.leaderboard,
+                player_name=f'Active{i}',
+                score=(i + 10) * 100  # 1000, 1100, 1200
+            )
+
+        for i in range(3):
+            score = Score.objects.create(
+                leaderboard=self.leaderboard,
+                player_name=f'Expired{i}',
+                score=i * 100  # 0, 100, 200
+            )
+            score.expires_at = timezone.now() - timedelta(days=1)
+            score.save()
+
+        self.assertEqual(self.leaderboard.scores.count(), 6)
+
+        # Run cleanup - expired scores are worse, should be deleted
+        # min_scores_to_keep=3 protects top 3, which are the active ones
+        call_command('cleanup_expired_scores')
+
+        # All 3 active scores should remain, expired ones deleted
+        self.assertEqual(self.leaderboard.scores.count(), 3)
+        for score in self.leaderboard.scores.all():
+            self.assertIn('Active', score.player_name)
+
+
+class RetentionFormAccessTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email='test@example.com',
+            password='testpass123'
+        )
+        self.game = Game.objects.create(owner=self.user, name='Test Game')
+        self.leaderboard = Leaderboard.objects.create(game=self.game, name='Test Board')
+        self.client.login(username='test@example.com', password='testpass123')
+
+    def test_regular_user_cannot_see_retention_fields(self):
+        """Test that users without can_customize don't see retention fields"""
+        response = self.client.get(reverse('leaderboards:leaderboard_edit', kwargs={
+            'game_slug': self.game.slug,
+            'leaderboard_slug': self.leaderboard.slug
+        }))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Minimum Scores to Keep')
+        self.assertNotContains(response, 'Maximum Scores')
+
+    def test_customize_user_can_see_retention_fields(self):
+        """Test that users with can_customize see retention fields"""
+        self.user.can_customize = True
+        self.user.save()
+
+        response = self.client.get(reverse('leaderboards:leaderboard_edit', kwargs={
+            'game_slug': self.game.slug,
+            'leaderboard_slug': self.leaderboard.slug
+        }))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Minimum Scores to Keep')
+        self.assertContains(response, 'Maximum Scores')
+
+    def test_customize_user_can_update_retention(self):
+        """Test that users with can_customize can update retention settings"""
+        self.user.can_customize = True
+        self.user.save()
+
+        response = self.client.post(
+            reverse('leaderboards:leaderboard_edit', kwargs={
+                'game_slug': self.game.slug,
+                'leaderboard_slug': self.leaderboard.slug
+            }),
+            {
+                'name': 'Test Board',
+                'leaderboard_type': 'score',
+                'sort_order': 'desc',
+                'min_scores_to_keep': 20,
+                'max_scores': 500
+            }
+        )
+        self.leaderboard.refresh_from_db()
+        self.assertEqual(self.leaderboard.min_scores_to_keep, 20)
+        self.assertEqual(self.leaderboard.max_scores, 500)
