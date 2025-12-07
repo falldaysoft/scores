@@ -20,17 +20,17 @@ class Command(BaseCommand):
 
     def cleanup_leaderboard(self, leaderboard, now):
         """Clean up expired scores for a leaderboard, preserving min_scores_to_keep."""
-        # Get scores ordered by quality (best first)
-        order = leaderboard.get_score_ordering()
-        ordered_ids = list(
-            leaderboard.scores.order_by(order).values_list('id', flat=True)
+        # Get the most recent score IDs (newest first)
+        recent_ids = list(
+            leaderboard.scores.order_by('-created_at')
+            .values_list('id', flat=True)[:leaderboard.min_scores_to_keep]
         )
 
-        if not ordered_ids:
+        if not recent_ids:
             return 0
 
-        # Protect top N scores from expiration
-        protected_ids = set(ordered_ids[:leaderboard.min_scores_to_keep])
+        # Protect the most recent scores from expiration
+        protected_ids = set(recent_ids)
 
         # Delete expired scores that are NOT protected
         deleted_count, _ = Score.objects.filter(

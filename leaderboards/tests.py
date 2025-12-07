@@ -342,36 +342,43 @@ class RetentionPolicyTest(TestCase):
         self.assertEqual(remaining_scores, [400, 300, 200])
 
     def test_cleanup_deletes_expired_beyond_min(self):
-        """Test that cleanup deletes expired scores beyond min_scores_to_keep"""
+        """Test that cleanup deletes expired scores beyond min_scores_to_keep.
+
+        Protection is based on recency (most recent scores kept), not score value.
+        This ensures cheater scores with inflated values eventually age out.
+        """
         from django.core.management import call_command
 
-        # Create 3 active scores and 3 expired scores
-        for i in range(3):
-            Score.objects.create(
-                leaderboard=self.leaderboard,
-                player_name=f'Active{i}',
-                score=(i + 10) * 100  # 1000, 1100, 1200
-            )
-
+        # Create 3 older expired scores (created first = older)
         for i in range(3):
             score = Score.objects.create(
                 leaderboard=self.leaderboard,
-                player_name=f'Expired{i}',
-                score=i * 100  # 0, 100, 200
+                player_name=f'Old{i}',
+                score=(i + 10) * 100  # Higher scores, but older
+            )
+            score.expires_at = timezone.now() - timedelta(days=1)
+            score.save()
+
+        # Create 3 recent expired scores (created last = newer, protected)
+        for i in range(3):
+            score = Score.objects.create(
+                leaderboard=self.leaderboard,
+                player_name=f'Recent{i}',
+                score=i * 100  # Lower scores, but more recent
             )
             score.expires_at = timezone.now() - timedelta(days=1)
             score.save()
 
         self.assertEqual(self.leaderboard.scores.count(), 6)
 
-        # Run cleanup - expired scores are worse, should be deleted
-        # min_scores_to_keep=3 protects top 3, which are the active ones
+        # Run cleanup - protects most recent 3 scores regardless of value
+        # Older expired scores should be deleted
         call_command('cleanup_expired_scores')
 
-        # All 3 active scores should remain, expired ones deleted
+        # The 3 most recent scores should remain (protected by recency)
         self.assertEqual(self.leaderboard.scores.count(), 3)
         for score in self.leaderboard.scores.all():
-            self.assertIn('Active', score.player_name)
+            self.assertIn('Recent', score.player_name)
 
 
 class RetentionFormAccessTest(TestCase):
