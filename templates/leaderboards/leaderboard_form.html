@@ -71,7 +71,7 @@
                     <div>
                         <label for="id_min_scores_to_keep" class="block text-sm font-medium text-gray-700 mb-1">Minimum Scores to Keep</label>
                         {{ form.min_scores_to_keep }}
-                        <p class="mt-1 text-xs text-gray-500">Keep at least this many top scores, even if expired (0-100)</p>
+                        <p class="mt-1 text-xs text-gray-500">Keep at least this many recent scores, even if expired (0-100)</p>
                         {% if form.min_scores_to_keep.errors %}
                         <p class="mt-1 text-sm text-red-600">{{ form.min_scores_to_keep.errors.0 }}</p>
                         {% endif %}
