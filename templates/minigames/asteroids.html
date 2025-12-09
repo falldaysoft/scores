@@ -1,0 +1,686 @@
+{% extends 'base.html' %}
+{% block title %}Asteroids{% endblock %}
+{% block content %}
+<div
+  class="bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 min-h-screen py-12"
+>
+  <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+    <div class="text-center mb-8">
+      <a
+        href="{% url 'minigames:play' %}"
+        class="text-gray-400 hover:text-white transition"
+        >&larr; Back to games</a
+      >
+      <h1 class="text-4xl font-bold text-white mt-4 mb-2">Asteroids</h1>
+      <p class="text-gray-300">
+        Shoot asteroids to score points! Use arrow keys or WASD to move, Space to shoot.
+      </p>
+    </div>
+
+    <div
+      x-data="asteroidsGame()"
+      x-init="init()"
+      class="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20"
+    >
+      <!-- Score and Lives -->
+      <div class="flex justify-between items-center mb-4">
+        <div class="text-white">
+          <span class="text-gray-400">Score:</span>
+          <span class="text-2xl font-bold ml-2" x-text="score"></span>
+        </div>
+        <div class="text-white">
+          <span class="text-gray-400">Lives:</span>
+          <span class="text-2xl font-bold ml-2 text-red-400" x-text="lives"></span>
+        </div>
+      </div>
+
+      <!-- Game Area -->
+      <div
+        class="relative w-full h-96 bg-black rounded-xl overflow-hidden select-none"
+        :class="state === 'ready' ? 'cursor-pointer' : ''"
+        @click="handleClick($event)"
+        @touchstart.prevent="handleTouch($event)"
+        x-ref="gameArea"
+        tabindex="0"
+        @keydown.window="handleKeyDown($event)"
+        @keyup.window="handleKeyUp($event)"
+      >
+        <!-- Stars background -->
+        <template x-for="star in stars" :key="star.id">
+          <div
+            class="absolute rounded-full bg-white"
+            :style="`left: ${star.x}%; top: ${star.y}%; width: ${star.size}px; height: ${star.size}px; opacity: ${star.opacity};`"
+          ></div>
+        </template>
+
+        <!-- Start Screen -->
+        <div
+          x-show="state === 'ready'"
+          class="absolute inset-0 flex items-center justify-center z-10"
+        >
+          <div class="text-center text-white">
+            <p class="text-2xl font-bold mb-2">Click to Start</p>
+            <p class="text-sm opacity-75 mb-2">
+              Tap/click to shoot and thrust toward target
+            </p>
+            <p class="text-xs opacity-50">
+              Or use arrow keys/WASD + Space. Survive as long as you can!
+            </p>
+          </div>
+        </div>
+
+        <!-- Ship -->
+        <div
+          x-show="state === 'playing' && !invulnerable || (invulnerable && Math.floor(Date.now() / 100) % 2)"
+          class="absolute transform -translate-x-1/2 -translate-y-1/2 transition-none"
+          :style="`left: ${ship.x}px; top: ${ship.y}px; transform: translate(-50%, -50%) rotate(${ship.angle}deg);`"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <!-- Ship pointing RIGHT (angle 0) -->
+            <polygon points="22,12 2,22 7,12 2,2" fill="#3B82F6" stroke="#60A5FA" stroke-width="1"/>
+          </svg>
+        </div>
+
+        <!-- Bullets -->
+        <template x-for="bullet in bullets" :key="bullet.id">
+          <div
+            class="absolute w-2 h-2 bg-yellow-400 rounded-full transform -translate-x-1/2 -translate-y-1/2"
+            :style="`left: ${bullet.x}px; top: ${bullet.y}px;`"
+          ></div>
+        </template>
+
+        <!-- Asteroids -->
+        <template x-for="asteroid in asteroids" :key="asteroid.id">
+          <div
+            class="absolute transform -translate-x-1/2 -translate-y-1/2"
+            :style="`left: ${asteroid.x}px; top: ${asteroid.y}px;`"
+          >
+            <svg :width="asteroid.size" :height="asteroid.size" viewBox="0 0 40 40">
+              <polygon
+                :points="asteroid.shape"
+                fill="#6B7280"
+                stroke="#9CA3AF"
+                stroke-width="2"
+                :transform="`rotate(${asteroid.rotation} 20 20)`"
+              />
+            </svg>
+          </div>
+        </template>
+
+        <!-- Explosions -->
+        <template x-for="explosion in explosions" :key="explosion.id">
+          <div
+            class="absolute transform -translate-x-1/2 -translate-y-1/2 pointer-events-none"
+            :style="`left: ${explosion.x}px; top: ${explosion.y}px;`"
+          >
+            <div
+              class="rounded-full bg-orange-500 animate-ping"
+              :style="`width: ${explosion.size}px; height: ${explosion.size}px; opacity: ${1 - explosion.progress};`"
+            ></div>
+          </div>
+        </template>
+
+        <!-- Game Over -->
+        <div
+          x-show="state === 'finished' || state === 'submitting' || state === 'submitted'"
+          x-cloak
+          class="absolute inset-0 flex items-center justify-center bg-black/70 z-20"
+        >
+          <div class="text-center text-white">
+            <p class="text-xl mb-2">Game Over!</p>
+            <p class="text-5xl font-bold" x-text="score + ' pts'"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Score Submission Form -->
+      <div x-show="state === 'finished'" x-cloak class="mt-6">
+        <form
+          @submit.prevent="submitScore()"
+          class="flex flex-col sm:flex-row gap-4"
+        >
+          <input
+            type="text"
+            x-model="playerName"
+            placeholder="Enter your name"
+            maxlength="50"
+            required
+            class="flex-1 px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="submit"
+            class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg transition"
+          >
+            Submit Score
+          </button>
+        </form>
+      </div>
+
+      <!-- Submitting State -->
+      <div
+        x-show="state === 'submitting'"
+        x-cloak
+        class="mt-6 text-center text-white"
+      >
+        <p>Submitting score...</p>
+      </div>
+
+      <!-- Submitted State -->
+      <div x-show="state === 'submitted'" x-cloak class="mt-6 text-center">
+        <p class="text-green-400 text-xl font-bold mb-4">Score submitted!</p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+          <button
+            @click="reset()"
+            class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg transition"
+          >
+            Play Again
+          </button>
+          <a
+            href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='asteroids' %}"
+            class="px-6 py-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition text-center"
+          >
+            View Leaderboard
+          </a>
+        </div>
+      </div>
+
+      <!-- Error State -->
+      <div
+        x-show="error && state === 'finished'"
+        x-cloak
+        class="mt-6 text-center"
+      >
+        <p class="text-red-400 mb-4" x-text="error"></p>
+        <button
+          @click="reset()"
+          class="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg transition"
+        >
+          Try Again
+        </button>
+      </div>
+    </div>
+
+    <!-- Leaderboard Preview -->
+    <div
+      class="mt-8 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20"
+    >
+      <h2 class="text-xl font-bold text-white mb-4">Top Scores</h2>
+      <div
+        id="leaderboard"
+        x-data="leaderboardPreview('mini-games', 'asteroids')"
+        x-init="fetchScores()"
+      >
+        <div x-show="loading" class="text-gray-400">Loading...</div>
+        <div x-show="!loading && scores.length === 0" class="text-gray-400">
+          No scores yet. Be the first!
+        </div>
+        <ul x-show="!loading && scores.length > 0" class="space-y-2">
+          <template x-for="(s, i) in scores" :key="i">
+            <li
+              class="flex justify-between items-center py-2 px-4 rounded-lg"
+              :class="i < 3 ? 'bg-white/10' : ''"
+            >
+              <div class="flex items-center gap-3">
+                <span
+                  class="text-gray-400 font-mono w-6"
+                  x-text="'#' + s.rank"
+                ></span>
+                <span class="text-white" x-text="s.player_name"></span>
+              </div>
+              <span
+                class="text-blue-400 font-bold"
+                x-text="s.score + ' pts'"
+              ></span>
+            </li>
+          </template>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Leaderboard Link -->
+    <p class="mt-4 text-center text-gray-400 text-sm">
+      <a
+        href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='asteroids' %}"
+        class="hover:text-white transition underline"
+        >View hosted leaderboard</a
+      >
+    </p>
+  </div>
+</div>
+
+<script>
+  function getPlayerId() {
+    let playerId = localStorage.getItem("scores_player_id");
+    if (!playerId) {
+      playerId = crypto.randomUUID();
+      localStorage.setItem("scores_player_id", playerId);
+    }
+    return playerId;
+  }
+
+  function getSavedPlayerName() {
+    return localStorage.getItem("scores_player_name") || "";
+  }
+
+  function savePlayerName(name) {
+    localStorage.setItem("scores_player_name", name);
+  }
+
+  function asteroidsGame() {
+    return {
+      state: "ready", // ready, playing, finished, submitting, submitted
+      score: 0,
+      lives: 1,
+      ship: { x: 0, y: 0, angle: -90, vx: 0, vy: 0 }, // -90 = pointing up
+      bullets: [],
+      asteroids: [],
+      explosions: [],
+      stars: [],
+      keys: { up: false, down: false, left: false, right: false, space: false },
+      playerName: getSavedPlayerName(),
+      error: null,
+      gameLoop: null,
+      bulletId: 0,
+      asteroidId: 0,
+      explosionId: 0,
+      lastShot: 0,
+      invulnerable: false,
+      gameWidth: 0,
+      gameHeight: 0,
+      spawnInterval: null,
+      gameTime: 0,
+      apiToken: "demo_asteroids_public_token_v1",
+
+      init() {
+        // Generate stars
+        for (let i = 0; i < 50; i++) {
+          this.stars.push({
+            id: i,
+            x: Math.random() * 100,
+            y: Math.random() * 100,
+            size: 1 + Math.random() * 2,
+            opacity: 0.3 + Math.random() * 0.7,
+          });
+        }
+      },
+
+      start() {
+        const gameArea = this.$refs.gameArea;
+        this.gameWidth = gameArea.offsetWidth;
+        this.gameHeight = gameArea.offsetHeight;
+
+        this.state = "playing";
+        this.score = 0;
+        this.lives = 1;
+        this.ship = {
+          x: this.gameWidth / 2,
+          y: this.gameHeight / 2,
+          angle: -90,
+          vx: 0,
+          vy: 0,
+        };
+        this.bullets = [];
+        this.asteroids = [];
+        this.explosions = [];
+        this.error = null;
+        this.invulnerable = false;
+        this.gameTime = 0;
+
+        // Spawn initial asteroids
+        for (let i = 0; i < 3; i++) {
+          this.spawnAsteroid(3);
+        }
+
+        // Start game loop
+        this.gameLoop = setInterval(() => this.update(), 1000 / 60);
+
+        // Spawn new asteroids periodically (gets faster over time)
+        this.spawnInterval = setInterval(() => {
+          this.gameTime++;
+          // Spawn rate increases: starts at every 3s, decreases to every 1s
+          const spawnRate = Math.max(1, 3 - Math.floor(this.gameTime / 5));
+          if (this.gameTime % spawnRate === 0) {
+            this.spawnAsteroid(3);
+          }
+        }, 1000);
+
+        gameArea.focus();
+      },
+
+      generateAsteroidShape() {
+        // Generate irregular polygon points
+        const points = [];
+        const numPoints = 8;
+        for (let i = 0; i < numPoints; i++) {
+          const angle = (i / numPoints) * Math.PI * 2;
+          const radius = 15 + Math.random() * 5;
+          const x = 20 + Math.cos(angle) * radius;
+          const y = 20 + Math.sin(angle) * radius;
+          points.push(`${x},${y}`);
+        }
+        return points.join(" ");
+      },
+
+      spawnAsteroid(size, x, y) {
+        const sizePixels = size * 30;
+        const asteroid = {
+          id: this.asteroidId++,
+          x: x !== undefined ? x : Math.random() < 0.5 ? 0 : this.gameWidth,
+          y: y !== undefined ? y : Math.random() * this.gameHeight,
+          size: sizePixels,
+          sizeClass: size,
+          vx: (Math.random() - 0.5) * (4 - size) * 1.5,
+          vy: (Math.random() - 0.5) * (4 - size) * 1.5,
+          rotation: Math.random() * 360,
+          rotationSpeed: (Math.random() - 0.5) * 3,
+          shape: this.generateAsteroidShape(),
+        };
+        this.asteroids.push(asteroid);
+      },
+
+      handleKeyDown(e) {
+        if (this.state !== "playing") return;
+        if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "w", "a", "s", "d"].includes(e.key)) {
+          e.preventDefault();
+        }
+        if (e.key === "ArrowUp" || e.key === "w") this.keys.up = true;
+        if (e.key === "ArrowDown" || e.key === "s") this.keys.down = true;
+        if (e.key === "ArrowLeft" || e.key === "a") this.keys.left = true;
+        if (e.key === "ArrowRight" || e.key === "d") this.keys.right = true;
+        if (e.key === " ") this.keys.space = true;
+      },
+
+      handleKeyUp(e) {
+        if (e.key === "ArrowUp" || e.key === "w") this.keys.up = false;
+        if (e.key === "ArrowDown" || e.key === "s") this.keys.down = false;
+        if (e.key === "ArrowLeft" || e.key === "a") this.keys.left = false;
+        if (e.key === "ArrowRight" || e.key === "d") this.keys.right = false;
+        if (e.key === " ") this.keys.space = false;
+      },
+
+      handleClick(e) {
+        if (this.state === "ready") {
+          this.start();
+          return;
+        }
+        if (this.state !== "playing") return;
+        this.handleTapAt(e.offsetX, e.offsetY);
+      },
+
+      handleTouch(e) {
+        if (this.state === "ready") {
+          this.start();
+          return;
+        }
+        if (this.state !== "playing") return;
+        const rect = this.$refs.gameArea.getBoundingClientRect();
+        const touch = e.touches[0];
+        const x = touch.clientX - rect.left;
+        const y = touch.clientY - rect.top;
+        this.handleTapAt(x, y);
+      },
+
+      handleTapAt(x, y) {
+        // Calculate angle to tap position
+        const dx = x - this.ship.x;
+        const dy = y - this.ship.y;
+        const targetAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+        // Set ship angle to face tap position
+        this.ship.angle = targetAngle;
+
+        // Thrust toward tap
+        const rad = (this.ship.angle * Math.PI) / 180;
+        this.ship.vx += Math.cos(rad) * 2;
+        this.ship.vy += Math.sin(rad) * 2;
+
+        // Shoot
+        this.shoot();
+      },
+
+      update() {
+        if (this.state !== "playing") return;
+
+        // Rotate ship
+        if (this.keys.left) this.ship.angle -= 5;
+        if (this.keys.right) this.ship.angle += 5;
+
+        // Thrust
+        if (this.keys.up) {
+          const rad = (this.ship.angle * Math.PI) / 180;
+          this.ship.vx += Math.cos(rad) * 0.3;
+          this.ship.vy += Math.sin(rad) * 0.3;
+        }
+        if (this.keys.down) {
+          this.ship.vx *= 0.95;
+          this.ship.vy *= 0.95;
+        }
+
+        // Apply friction
+        this.ship.vx *= 0.99;
+        this.ship.vy *= 0.99;
+
+        // Limit speed
+        const maxSpeed = 8;
+        const speed = Math.sqrt(this.ship.vx ** 2 + this.ship.vy ** 2);
+        if (speed > maxSpeed) {
+          this.ship.vx = (this.ship.vx / speed) * maxSpeed;
+          this.ship.vy = (this.ship.vy / speed) * maxSpeed;
+        }
+
+        // Move ship
+        this.ship.x += this.ship.vx;
+        this.ship.y += this.ship.vy;
+
+        // Wrap around screen
+        if (this.ship.x < 0) this.ship.x = this.gameWidth;
+        if (this.ship.x > this.gameWidth) this.ship.x = 0;
+        if (this.ship.y < 0) this.ship.y = this.gameHeight;
+        if (this.ship.y > this.gameHeight) this.ship.y = 0;
+
+        // Shoot
+        const now = Date.now();
+        if (this.keys.space && now - this.lastShot > 200) {
+          this.shoot();
+          this.lastShot = now;
+        }
+
+        // Update bullets
+        this.bullets.forEach((bullet) => {
+          bullet.x += bullet.vx;
+          bullet.y += bullet.vy;
+          bullet.life--;
+        });
+        this.bullets = this.bullets.filter(
+          (b) => b.life > 0 && b.x >= 0 && b.x <= this.gameWidth && b.y >= 0 && b.y <= this.gameHeight
+        );
+
+        // Update asteroids
+        this.asteroids.forEach((asteroid) => {
+          asteroid.x += asteroid.vx;
+          asteroid.y += asteroid.vy;
+          asteroid.rotation += asteroid.rotationSpeed;
+
+          // Wrap around screen
+          if (asteroid.x < -asteroid.size) asteroid.x = this.gameWidth + asteroid.size;
+          if (asteroid.x > this.gameWidth + asteroid.size) asteroid.x = -asteroid.size;
+          if (asteroid.y < -asteroid.size) asteroid.y = this.gameHeight + asteroid.size;
+          if (asteroid.y > this.gameHeight + asteroid.size) asteroid.y = -asteroid.size;
+        });
+
+        // Update explosions
+        this.explosions.forEach((exp) => {
+          exp.progress += 0.05;
+        });
+        this.explosions = this.explosions.filter((e) => e.progress < 1);
+
+        // Check bullet-asteroid collisions
+        const bulletsToRemove = new Set();
+        const asteroidsToRemove = new Set();
+        const newAsteroids = [];
+
+        this.bullets.forEach((bullet) => {
+          this.asteroids.forEach((asteroid) => {
+            const dx = bullet.x - asteroid.x;
+            const dy = bullet.y - asteroid.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < asteroid.size / 2) {
+              bulletsToRemove.add(bullet.id);
+              asteroidsToRemove.add(asteroid.id);
+
+              // Score based on size
+              this.score += (4 - asteroid.sizeClass) * 20;
+
+              // Create explosion
+              this.explosions.push({
+                id: this.explosionId++,
+                x: asteroid.x,
+                y: asteroid.y,
+                size: asteroid.size,
+                progress: 0,
+              });
+
+              // Split asteroid
+              if (asteroid.sizeClass > 1) {
+                for (let i = 0; i < 2; i++) {
+                  newAsteroids.push({
+                    size: asteroid.sizeClass - 1,
+                    x: asteroid.x,
+                    y: asteroid.y,
+                  });
+                }
+              }
+            }
+          });
+        });
+
+        this.bullets = this.bullets.filter((b) => !bulletsToRemove.has(b.id));
+        this.asteroids = this.asteroids.filter((a) => !asteroidsToRemove.has(a.id));
+
+        newAsteroids.forEach((a) => this.spawnAsteroid(a.size, a.x, a.y));
+
+        // Check ship-asteroid collision
+        if (!this.invulnerable) {
+          this.asteroids.forEach((asteroid) => {
+            const dx = this.ship.x - asteroid.x;
+            const dy = this.ship.y - asteroid.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < asteroid.size / 2 + 10) {
+              this.lives--;
+              this.explosions.push({
+                id: this.explosionId++,
+                x: this.ship.x,
+                y: this.ship.y,
+                size: 30,
+                progress: 0,
+              });
+
+              if (this.lives <= 0) {
+                this.finish();
+              } else {
+                // Respawn ship
+                this.ship.x = this.gameWidth / 2;
+                this.ship.y = this.gameHeight / 2;
+                this.ship.vx = 0;
+                this.ship.vy = 0;
+                this.invulnerable = true;
+                setTimeout(() => (this.invulnerable = false), 2000);
+              }
+            }
+          });
+        }
+
+      },
+
+      shoot() {
+        const rad = (this.ship.angle * Math.PI) / 180;
+        this.bullets.push({
+          id: this.bulletId++,
+          x: this.ship.x + Math.cos(rad) * 15,
+          y: this.ship.y + Math.sin(rad) * 15,
+          vx: Math.cos(rad) * 10 + this.ship.vx * 0.5,
+          vy: Math.sin(rad) * 10 + this.ship.vy * 0.5,
+          life: 60,
+        });
+      },
+
+      finish() {
+        clearInterval(this.gameLoop);
+        clearInterval(this.spawnInterval);
+        this.state = "finished";
+      },
+
+      async submitScore() {
+        if (!this.playerName.trim()) return;
+
+        this.state = "submitting";
+        this.error = null;
+        savePlayerName(this.playerName.trim());
+
+        try {
+          const response = await fetch("/api/v1/scores/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + this.apiToken,
+            },
+            body: JSON.stringify({
+              player_name: this.playerName.trim(),
+              score: this.score,
+              player_id: getPlayerId(),
+            }),
+          });
+
+          if (response.ok) {
+            this.state = "submitted";
+            const leaderboardEl = document.querySelector("#leaderboard");
+            if (leaderboardEl && leaderboardEl._x_dataStack) {
+              leaderboardEl._x_dataStack[0].fetchScores();
+            }
+          } else {
+            const data = await response.json();
+            this.error = data.error || "Failed to submit score";
+            this.state = "finished";
+          }
+        } catch (e) {
+          this.error = "Network error. Please try again.";
+          this.state = "finished";
+        }
+      },
+
+      reset() {
+        this.state = "ready";
+        this.score = 0;
+        this.lives = 1;
+        this.bullets = [];
+        this.asteroids = [];
+        this.explosions = [];
+        this.error = null;
+      },
+    };
+  }
+
+  function leaderboardPreview(gameSlug, leaderboardSlug) {
+    return {
+      scores: [],
+      loading: true,
+
+      async fetchScores() {
+        this.loading = true;
+        try {
+          const response = await fetch(
+            `/api/v1/scores/${gameSlug}/${leaderboardSlug}/?limit=10`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            this.scores = data.scores;
+          }
+        } catch (e) {
+          console.error("Failed to fetch scores:", e);
+        }
+        this.loading = false;
+      },
+    };
+  }
+</script>
+{% endblock %}

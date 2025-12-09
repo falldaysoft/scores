@@ -13,6 +13,7 @@ DEMO_API_TOKENS = {
     'whack-a-mole': 'demo_whack_a_mole_public_token_v1',
     'snowflakes': 'demo_snowflakes_public_token_v1',
     'daily-riddle': 'demo_daily_riddle_public_token_v1',
+    'asteroids': 'demo_asteroids_public_token_v1',
 }
 
 
@@ -61,6 +62,12 @@ class Command(BaseCommand):
             'sort_order': 'newest',  # Show most recent solvers first
             'leaderboard_type': 'correct_answer',
             'correct_answer': 'map',
+        },
+        {
+            'name': 'Asteroids',
+            'slug': 'asteroids',
+            'description': 'Pilot your ship and destroy asteroids! How long can you survive?',
+            'sort_order': 'desc',  # Higher score = better
         },
     ]
 
