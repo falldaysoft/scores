@@ -607,6 +607,7 @@
       finish() {
         clearInterval(this.gameLoop);
         clearInterval(this.spawnInterval);
+        setTimeout(() => this.explosions = [], 500);
         this.state = "finished";
       },
 
