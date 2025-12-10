@@ -39,7 +39,7 @@
 
       <!-- Game Area -->
       <div
-        class="relative w-full h-80 bg-gray-800 rounded-xl overflow-hidden select-none"
+        class="relative w-full h-80 bg-gray-800 rounded-xl overflow-hidden select-none cursor-crosshair"
         :class="state === 'ready' ? 'cursor-pointer' : ''"
         @click="state === 'ready' && start()"
       >
@@ -61,7 +61,7 @@
           <div
             @click.stop="hitTarget(target)"
             :style="`left: ${target.x}%; top: ${target.y}%; width: ${target.size}px; height: ${target.size}px;`"
-            class="absolute rounded-full cursor-crosshair transform -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-110"
+            class="absolute rounded-full cursor-cell transform -translate-x-1/2 -translate-y-1/2 transition-transform hover:scale-110"
             :class="target.size < 35 ? 'bg-red-500' : target.size < 50 ? 'bg-yellow-500' : 'bg-green-500'"
           >
             <div class="absolute inset-0 flex items-center justify-center">
