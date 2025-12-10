@@ -1,5 +1,5 @@
 asgiref==3.11.0
-Django==5.2.8
+Django==6.0
 django-cors-headers==4.9.0
 django-extensions==4.1
 django-htmx==1.26.0
