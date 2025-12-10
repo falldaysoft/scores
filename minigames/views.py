@@ -44,3 +44,8 @@ class AsteroidsGameView(TemplateView):
 class TileGameView(TemplateView):
     """Standalone page for Tile Puzzle game"""
     template_name = 'minigames/tiles.html'
+
+
+class MinesweepGameView(TemplateView):
+    """Standalone page for Minesweeper game"""
+    template_name = 'minigames/minesweep.html'

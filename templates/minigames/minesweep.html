@@ -1,0 +1,464 @@
+{% extends 'base.html' %}
+
+{% block title %}Minesweeper{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-gray-900 via-slate-900 to-gray-800 min-h-screen py-12">
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-8">
+            <a href="{% url 'minigames:play' %}" class="text-gray-400 hover:text-white transition">&larr; Back to games</a>
+            <h1 class="text-4xl font-bold text-white mt-4 mb-2">Minesweeper</h1>
+            <p class="text-gray-300">Clear the board without hitting any mines. Faster times win!</p>
+        </div>
+
+        <div x-data="minesweepGame()" class="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <!-- Game Stats -->
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-4">
+                    <div class="text-red-400 font-mono text-xl flex items-center gap-1">
+                        <span>&#128163;</span>
+                        <span x-text="minesRemaining"></span>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <template x-if="state === 'ready'">
+                        <p class="text-2xl text-white font-mono">0.00s</p>
+                    </template>
+                    <template x-if="state === 'playing'">
+                        <p class="text-2xl text-green-400 font-mono" x-text="currentTime.toFixed(2) + 's'"></p>
+                    </template>
+                    <template x-if="state === 'won' || state === 'submitting' || state === 'submitted'">
+                        <p class="text-2xl text-yellow-400 font-mono" x-text="score.toFixed(2) + 's'"></p>
+                    </template>
+                    <template x-if="state === 'lost'">
+                        <p class="text-2xl text-red-400 font-mono" x-text="currentTime.toFixed(2) + 's'"></p>
+                    </template>
+                </div>
+                <div class="text-gray-400 font-mono text-sm">
+                    <span x-text="revealedCount"></span>/<span x-text="totalSafeCells"></span>
+                </div>
+            </div>
+
+            <!-- Game Board -->
+            <div class="flex justify-center mb-6 overflow-x-auto">
+                <div class="grid gap-0.5 p-2 bg-gray-800 rounded-xl select-none"
+                     :style="`grid-template-columns: repeat(${cols}, minmax(0, 1fr))`">
+                    <template x-for="(cell, index) in board" :key="index">
+                        <button
+                            @click="reveal(index)"
+                            @contextmenu.prevent="toggleFlag(index)"
+                            @touchstart="handleTouchStart(index, $event)"
+                            @touchend="handleTouchEnd(index, $event)"
+                            :disabled="state === 'won' || state === 'lost' || state === 'submitting' || state === 'submitted'"
+                            :class="getCellClass(index)"
+                            class="w-7 h-7 sm:w-8 sm:h-8 rounded text-sm sm:text-base font-bold transition-all duration-100"
+                        >
+                            <span x-html="getCellContent(index)"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Instructions -->
+            <div x-show="state === 'ready'" class="text-center text-gray-400 text-sm mb-4">
+                <p>Click to reveal. Right-click or long-press to flag mines.</p>
+            </div>
+
+            <!-- Playing State -->
+            <div x-show="state === 'playing'" class="text-center text-gray-400 text-sm">
+                <p>Find all safe cells to win!</p>
+            </div>
+
+            <!-- Lost State -->
+            <div x-show="state === 'lost'" x-cloak class="mt-6 text-center">
+                <p class="text-red-400 text-xl font-bold mb-4">BOOM! You hit a mine!</p>
+                <button @click="reset()" class="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded-lg transition">
+                    Try Again
+                </button>
+            </div>
+
+            <!-- Won State - Score Submission Form -->
+            <div x-show="state === 'won'" x-cloak class="mt-6">
+                <p class="text-green-400 text-xl font-bold text-center mb-4">You cleared the board!</p>
+                <form @submit.prevent="submitScore()" class="flex flex-col sm:flex-row gap-4">
+                    <input
+                        type="text"
+                        x-model="playerName"
+                        placeholder="Enter your name"
+                        maxlength="50"
+                        required
+                        class="flex-1 px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                    <button
+                        type="submit"
+                        class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition"
+                    >
+                        Submit Score
+                    </button>
+                </form>
+            </div>
+
+            <!-- Submitting State -->
+            <div x-show="state === 'submitting'" x-cloak class="mt-6 text-center text-white">
+                <p>Submitting score...</p>
+            </div>
+
+            <!-- Submitted State -->
+            <div x-show="state === 'submitted'" x-cloak class="mt-6 text-center">
+                <p class="text-green-400 text-xl font-bold mb-4">Score submitted!</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button @click="reset()" class="px-6 py-3 bg-gray-600 hover:bg-gray-500 text-white font-bold rounded-lg transition">
+                        Play Again
+                    </button>
+                    <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='minesweep' %}" class="px-6 py-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition text-center">
+                        View Leaderboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div x-show="error && state === 'won'" x-cloak class="mt-4 text-center">
+                <p class="text-red-400" x-text="error"></p>
+            </div>
+        </div>
+
+        <!-- Leaderboard Preview -->
+        <div class="mt-8 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <h2 class="text-xl font-bold text-white mb-4">Top Scores</h2>
+            <div id="leaderboard" x-data="leaderboardPreview('mini-games', 'minesweep')" x-init="fetchScores()">
+                <div x-show="loading" class="text-gray-400">Loading...</div>
+                <div x-show="!loading && scores.length === 0" class="text-gray-400">No scores yet. Be the first!</div>
+                <ul x-show="!loading && scores.length > 0" class="space-y-2">
+                    <template x-for="(s, i) in scores" :key="i">
+                        <li class="flex justify-between items-center py-2 px-4 rounded-lg" :class="i < 3 ? 'bg-white/10' : ''">
+                            <div class="flex items-center gap-3">
+                                <span class="text-gray-400 font-mono w-6" x-text="'#' + s.rank"></span>
+                                <span class="text-white" x-text="s.player_name"></span>
+                            </div>
+                            <span class="text-green-400 font-bold" x-text="s.score.toFixed(2) + 's'"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Leaderboard Link -->
+        <p class="mt-4 text-center text-gray-400 text-sm">
+            <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='minesweep' %}" class="hover:text-white transition underline">View full leaderboard</a>
+        </p>
+    </div>
+</div>
+
+<script>
+function getPlayerId() {
+    let playerId = localStorage.getItem('scores_player_id');
+    if (!playerId) {
+        playerId = crypto.randomUUID();
+        localStorage.setItem('scores_player_id', playerId);
+    }
+    return playerId;
+}
+
+function getSavedPlayerName() {
+    return localStorage.getItem('scores_player_name') || '';
+}
+
+function savePlayerName(name) {
+    localStorage.setItem('scores_player_name', name);
+}
+
+function minesweepGame() {
+    return {
+        state: 'ready', // ready, playing, won, lost, submitting, submitted
+        rows: 9,
+        cols: 9,
+        mineCount: 10,
+        board: [],        // -1 = mine, 0-8 = adjacent mine count
+        revealed: [],     // true/false for each cell
+        flagged: [],      // true/false for each cell
+        score: 0,
+        currentTime: 0,
+        playerName: getSavedPlayerName(),
+        error: null,
+        startTime: null,
+        timerInterval: null,
+        apiToken: 'demo_minesweep_public_token_v1',
+        touchTimer: null,
+        touchStartIndex: null,
+
+        get minesRemaining() {
+            const flagCount = this.flagged.filter(f => f).length;
+            return this.mineCount - flagCount;
+        },
+
+        get revealedCount() {
+            return this.revealed.filter(r => r).length;
+        },
+
+        get totalSafeCells() {
+            return this.rows * this.cols - this.mineCount;
+        },
+
+        init() {
+            this.initBoard();
+        },
+
+        initBoard() {
+            const totalCells = this.rows * this.cols;
+            this.board = new Array(totalCells).fill(0);
+            this.revealed = new Array(totalCells).fill(false);
+            this.flagged = new Array(totalCells).fill(false);
+        },
+
+        placeMines(firstClickIndex) {
+            // Place mines, avoiding the first clicked cell and its neighbors
+            const totalCells = this.rows * this.cols;
+            const safeCells = new Set([firstClickIndex, ...this.getNeighbors(firstClickIndex)]);
+
+            let placedMines = 0;
+            while (placedMines < this.mineCount) {
+                const index = Math.floor(Math.random() * totalCells);
+                if (!safeCells.has(index) && this.board[index] !== -1) {
+                    this.board[index] = -1;
+                    placedMines++;
+                }
+            }
+
+            // Calculate adjacent mine counts
+            for (let i = 0; i < totalCells; i++) {
+                if (this.board[i] !== -1) {
+                    const neighbors = this.getNeighbors(i);
+                    this.board[i] = neighbors.filter(n => this.board[n] === -1).length;
+                }
+            }
+        },
+
+        getNeighbors(index) {
+            const neighbors = [];
+            const row = Math.floor(index / this.cols);
+            const col = index % this.cols;
+
+            for (let dr = -1; dr <= 1; dr++) {
+                for (let dc = -1; dc <= 1; dc++) {
+                    if (dr === 0 && dc === 0) continue;
+                    const nr = row + dr;
+                    const nc = col + dc;
+                    if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols) {
+                        neighbors.push(nr * this.cols + nc);
+                    }
+                }
+            }
+            return neighbors;
+        },
+
+        reveal(index) {
+            if (this.state === 'won' || this.state === 'lost' || this.state === 'submitting' || this.state === 'submitted') return;
+            if (this.revealed[index] || this.flagged[index]) return;
+
+            // First click - place mines and start timer
+            if (this.state === 'ready') {
+                this.placeMines(index);
+                this.state = 'playing';
+                this.startTime = performance.now();
+                this.timerInterval = setInterval(() => {
+                    this.currentTime = (performance.now() - this.startTime) / 1000;
+                }, 10);
+            }
+
+            // Hit a mine
+            if (this.board[index] === -1) {
+                this.revealed[index] = true;
+                this.gameOver(false);
+                return;
+            }
+
+            // Reveal this cell
+            this.revealCell(index);
+
+            // Check for win
+            if (this.revealedCount === this.totalSafeCells) {
+                this.gameOver(true);
+            }
+        },
+
+        revealCell(index) {
+            if (this.revealed[index] || this.flagged[index]) return;
+            if (this.board[index] === -1) return;
+
+            this.revealed[index] = true;
+
+            // If empty cell, reveal neighbors recursively
+            if (this.board[index] === 0) {
+                const neighbors = this.getNeighbors(index);
+                neighbors.forEach(n => this.revealCell(n));
+            }
+        },
+
+        toggleFlag(index) {
+            if (this.state === 'won' || this.state === 'lost' || this.state === 'submitting' || this.state === 'submitted') return;
+            if (this.revealed[index]) return;
+            if (this.state === 'ready') return; // Can't flag before first reveal
+
+            this.flagged[index] = !this.flagged[index];
+        },
+
+        handleTouchStart(index, event) {
+            this.touchStartIndex = index;
+            this.touchTimer = setTimeout(() => {
+                this.toggleFlag(index);
+                this.touchStartIndex = null;
+            }, 500);
+        },
+
+        handleTouchEnd(index, event) {
+            if (this.touchTimer) {
+                clearTimeout(this.touchTimer);
+                this.touchTimer = null;
+            }
+            if (this.touchStartIndex === index) {
+                // Short tap - reveal
+                this.reveal(index);
+            }
+            this.touchStartIndex = null;
+        },
+
+        gameOver(won) {
+            clearInterval(this.timerInterval);
+            this.currentTime = (performance.now() - this.startTime) / 1000;
+
+            if (won) {
+                this.score = this.currentTime;
+                this.state = 'won';
+            } else {
+                // Reveal all mines
+                for (let i = 0; i < this.board.length; i++) {
+                    if (this.board[i] === -1) {
+                        this.revealed[i] = true;
+                    }
+                }
+                this.state = 'lost';
+            }
+        },
+
+        getCellClass(index) {
+            const isRevealed = this.revealed[index];
+            const isFlagged = this.flagged[index];
+            const isMine = this.board[index] === -1;
+            const isGameOver = this.state === 'won' || this.state === 'lost' || this.state === 'submitting' || this.state === 'submitted';
+
+            if (isRevealed) {
+                if (isMine) {
+                    return 'bg-red-600 text-white cursor-default';
+                }
+                return 'bg-gray-600 text-white cursor-default';
+            }
+
+            if (isFlagged) {
+                return 'bg-yellow-600 hover:bg-yellow-500 text-white cursor-pointer';
+            }
+
+            if (isGameOver) {
+                return 'bg-gray-700 text-white cursor-default';
+            }
+
+            return 'bg-gray-500 hover:bg-gray-400 text-white cursor-pointer';
+        },
+
+        getCellContent(index) {
+            const isRevealed = this.revealed[index];
+            const isFlagged = this.flagged[index];
+            const value = this.board[index];
+
+            if (isFlagged && !isRevealed) {
+                return '&#128681;'; // Flag emoji
+            }
+
+            if (!isRevealed) {
+                return '';
+            }
+
+            if (value === -1) {
+                return '&#128163;'; // Bomb emoji
+            }
+
+            if (value === 0) {
+                return '';
+            }
+
+            // Color-coded numbers
+            const colors = ['', 'text-blue-300', 'text-green-300', 'text-red-400', 'text-purple-400', 'text-yellow-400', 'text-cyan-400', 'text-pink-400', 'text-gray-300'];
+            return `<span class="${colors[value]}">${value}</span>`;
+        },
+
+        async submitScore() {
+            if (!this.playerName.trim()) return;
+
+            this.state = 'submitting';
+            this.error = null;
+            savePlayerName(this.playerName.trim());
+
+            try {
+                const response = await fetch('/api/v1/scores/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + this.apiToken
+                    },
+                    body: JSON.stringify({
+                        player_name: this.playerName.trim(),
+                        score: Math.round(this.score * 100) / 100,
+                        player_id: getPlayerId()
+                    })
+                });
+
+                if (response.ok) {
+                    this.state = 'submitted';
+                    const leaderboardEl = document.querySelector('#leaderboard');
+                    if (leaderboardEl && leaderboardEl._x_dataStack) {
+                        leaderboardEl._x_dataStack[0].fetchScores();
+                    }
+                } else {
+                    const data = await response.json();
+                    this.error = data.error || 'Failed to submit score';
+                    this.state = 'won';
+                }
+            } catch (e) {
+                this.error = 'Network error. Please try again.';
+                this.state = 'won';
+            }
+        },
+
+        reset() {
+            this.state = 'ready';
+            this.score = 0;
+            this.currentTime = 0;
+            this.error = null;
+            this.startTime = null;
+            clearInterval(this.timerInterval);
+            this.initBoard();
+        }
+    };
+}
+
+function leaderboardPreview(gameSlug, leaderboardSlug) {
+    return {
+        scores: [],
+        loading: true,
+
+        async fetchScores() {
+            this.loading = true;
+            try {
+                const response = await fetch(`/api/v1/scores/${gameSlug}/${leaderboardSlug}/?limit=10`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.scores = data.scores;
+                }
+            } catch (e) {
+                console.error('Failed to fetch scores:', e);
+            }
+            this.loading = false;
+        }
+    };
+}
+</script>
+{% endblock %}

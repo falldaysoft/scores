@@ -369,6 +369,193 @@ class ScoreAPITest(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn('player_id', response.data['scores'][0])
 
+    def test_submit_integer_score(self):
+        """Test submitting an integer score (e.g., points in arcade game)"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'score': 5000
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+        score = Score.objects.get(player_name='Player1')
+        self.assertEqual(score.score, 5000)
+
+    def test_submit_float_score(self):
+        """Test submitting a float score (e.g., time in seconds)"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'score': 84.21
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+        score = Score.objects.get(player_name='Player1')
+        self.assertAlmostEqual(score.score, 84.21, places=2)
+
+    def test_submit_float_score_precision(self):
+        """Test that float scores maintain reasonable precision"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'score': 12.3456789
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+        score = Score.objects.get(player_name='Player1')
+        # FloatField should preserve several decimal places
+        self.assertAlmostEqual(score.score, 12.3456789, places=5)
+
+    def test_get_scores_returns_float_scores(self):
+        """Test that GET endpoint returns float scores correctly"""
+        Score.objects.create(leaderboard=self.leaderboard, player_name='Player1', score=84.21)
+        Score.objects.create(leaderboard=self.leaderboard, player_name='Player2', score=92.55)
+
+        response = self.client.get(
+            reverse('api:scores'),
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 200)
+        scores = {s['player_name']: s['score'] for s in response.data['scores']}
+        self.assertAlmostEqual(scores['Player1'], 84.21, places=2)
+        self.assertAlmostEqual(scores['Player2'], 92.55, places=2)
+
+    def test_float_score_comparison_asc_leaderboard(self):
+        """Test that float scores are compared correctly on asc leaderboards (lower is better)"""
+        self.leaderboard.sort_order = 'asc'
+        self.leaderboard.save()
+
+        # First submission: 15.50 seconds
+        self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 15.50
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+
+        # Second submission: 14.25 seconds (better time, should update)
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 14.25
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['is_high_score'])
+        score = Score.objects.first()
+        self.assertAlmostEqual(score.score, 14.25, places=2)
+
+    def test_float_score_comparison_asc_worse_not_updated(self):
+        """Test that worse float scores don't update on asc leaderboards"""
+        self.leaderboard.sort_order = 'asc'
+        self.leaderboard.save()
+
+        # First submission: 14.25 seconds
+        self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 14.25
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+
+        # Second submission: 15.50 seconds (worse time, should NOT update)
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 15.50
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.data['is_high_score'])
+        score = Score.objects.first()
+        self.assertAlmostEqual(score.score, 14.25, places=2)
+
+    def test_float_score_comparison_desc_leaderboard(self):
+        """Test that float scores are compared correctly on desc leaderboards (higher is better)"""
+        # Default is desc
+        # First submission: 84.21 points
+        self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 84.21
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+
+        # Second submission: 92.55 points (better score, should update)
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'player_id': 'user-123',
+                'score': 92.55
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['is_high_score'])
+        score = Score.objects.first()
+        self.assertAlmostEqual(score.score, 92.55, places=2)
+
+    def test_zero_score(self):
+        """Test submitting a zero score"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'score': 0
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+        score = Score.objects.get(player_name='Player1')
+        self.assertEqual(score.score, 0)
+
+    def test_negative_score(self):
+        """Test submitting a negative score (some games use this)"""
+        response = self.client.post(
+            reverse('api:scores'),
+            {
+                'player_name': 'Player1',
+                'score': -50
+            },
+            format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.leaderboard.api_token}'
+        )
+        self.assertEqual(response.status_code, 201)
+        score = Score.objects.get(player_name='Player1')
+        self.assertEqual(score.score, -50)
+
 
 class PublicScoreAPITest(TestCase):
     def setUp(self):

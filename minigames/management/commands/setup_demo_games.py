@@ -15,6 +15,7 @@ DEMO_API_TOKENS = {
     'daily-riddle': 'demo_daily_riddle_public_token_v1',
     'asteroids': 'demo_asteroids_public_token_v1',
     'tile-game': 'demo_tile_game_public_token_v1',
+    'minesweep': 'demo_minesweep_public_token_v1',
 }
 
 
@@ -74,6 +75,12 @@ class Command(BaseCommand):
             'name': 'Tile Game',
             'slug': 'tile-game',
             'description': 'Slide the tiles to arrange them in order. Faster times win!',
+            'sort_order': 'asc',  # Lower time = better
+        },
+        {
+            'name': 'Minesweeper',
+            'slug': 'minesweep',
+            'description': 'Clear the board without hitting any mines. Faster times win!',
             'sort_order': 'asc',  # Lower time = better
         },
     ]

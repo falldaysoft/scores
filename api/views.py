@@ -67,10 +67,10 @@ class ScoreAPIView(APIView):
                 )
 
         try:
-            score_value = int(score_value)
+            score_value = float(score_value)
         except (ValueError, TypeError):
             return Response(
-                {'success': False, 'error': 'score must be an integer'},
+                {'success': False, 'error': 'score must be a number'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

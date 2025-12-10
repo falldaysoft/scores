@@ -117,7 +117,7 @@ class Score(models.Model):
     leaderboard = models.ForeignKey(Leaderboard, on_delete=models.CASCADE, related_name='scores')
     player_name = models.CharField(max_length=50)
     player_id = models.CharField(max_length=100, null=True)
-    score = models.BigIntegerField(null=True, blank=True, default=0)
+    score = models.FloatField(null=True, blank=True, default=0)
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
