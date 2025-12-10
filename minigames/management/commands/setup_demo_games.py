@@ -14,6 +14,7 @@ DEMO_API_TOKENS = {
     'snowflakes': 'demo_snowflakes_public_token_v1',
     'daily-riddle': 'demo_daily_riddle_public_token_v1',
     'asteroids': 'demo_asteroids_public_token_v1',
+    'tile-game': 'demo_tile_game_public_token_v1',
 }
 
 
@@ -68,6 +69,12 @@ class Command(BaseCommand):
             'slug': 'asteroids',
             'description': 'Pilot your ship and destroy asteroids! How long can you survive?',
             'sort_order': 'desc',  # Higher score = better
+        },
+        {
+            'name': 'Tile Game',
+            'slug': 'tile-game',
+            'description': 'Slide the tiles to arrange them in order. Faster times win!',
+            'sort_order': 'asc',  # Lower time = better
         },
     ]
 

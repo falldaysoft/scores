@@ -1,0 +1,342 @@
+{% extends 'base.html' %}
+
+{% block title %}Tile Game{% endblock %}
+
+{% block content %}
+<div class="bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 min-h-screen py-12">
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-8">
+            <a href="{% url 'minigames:play' %}" class="text-indigo-300 hover:text-white transition">&larr; Back to games</a>
+            <h1 class="text-4xl font-bold text-white mt-4 mb-2">Tile Game</h1>
+            <p class="text-indigo-200">Slide the tiles to arrange them in order. Faster times win!</p>
+        </div>
+
+        <div x-data="tileGame()" class="bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <!-- Timer Display -->
+            <div class="text-center mb-4">
+                <template x-if="state === 'ready'">
+                    <p class="text-2xl text-white font-mono">0.00s</p>
+                </template>
+                <template x-if="state === 'playing'">
+                    <p class="text-2xl text-green-400 font-mono" x-text="currentTime.toFixed(2) + 's'"></p>
+                </template>
+                <template x-if="state === 'finished' || state === 'submitting' || state === 'submitted'">
+                    <p class="text-2xl text-yellow-400 font-mono" x-text="score.toFixed(2) + 's'"></p>
+                </template>
+            </div>
+
+            <!-- Game Board -->
+            <div class="flex justify-center mb-6">
+                <div class="grid grid-cols-3 gap-2 p-4 bg-gray-800 rounded-xl">
+                    <template x-for="(tile, index) in tiles" :key="index + '-' + tile">
+                        <button
+                            @click="moveTile(index)"
+                            :disabled="state === 'finished' || state === 'submitting' || state === 'submitted'"
+                            :class="{
+                                'bg-indigo-500 hover:bg-indigo-400 text-white cursor-pointer': tile !== 0 && state !== 'finished' && state !== 'submitting' && state !== 'submitted',
+                                'bg-indigo-600 text-white cursor-default': tile !== 0 && (state === 'finished' || state === 'submitting' || state === 'submitted'),
+                                'bg-transparent cursor-default': tile === 0
+                            }"
+                            class="w-20 h-20 sm:w-24 sm:h-24 rounded-lg text-3xl sm:text-4xl font-bold transition-all duration-150 select-none"
+                        >
+                            <span x-show="tile !== 0" x-text="tile"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Ready State -->
+            <div x-show="state === 'ready'" class="text-center">
+                <p class="text-indigo-200 mb-4">Click any tile next to the empty space to start!</p>
+            </div>
+
+            <!-- Playing State -->
+            <div x-show="state === 'playing'" class="text-center">
+                <p class="text-indigo-200">Arrange tiles 1-15 in order, left to right, top to bottom.</p>
+            </div>
+
+            <!-- Score Submission Form -->
+            <div x-show="state === 'finished'" x-cloak class="mt-6">
+                <p class="text-green-400 text-xl font-bold text-center mb-4">Puzzle solved!</p>
+                <form @submit.prevent="submitScore()" class="flex flex-col sm:flex-row gap-4">
+                    <input
+                        type="text"
+                        x-model="playerName"
+                        placeholder="Enter your name"
+                        maxlength="50"
+                        required
+                        class="flex-1 px-4 py-3 rounded-lg bg-white/20 border border-white/30 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                    <button
+                        type="submit"
+                        class="px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg transition"
+                    >
+                        Submit Score
+                    </button>
+                </form>
+            </div>
+
+            <!-- Submitting State -->
+            <div x-show="state === 'submitting'" x-cloak class="mt-6 text-center text-white">
+                <p>Submitting score...</p>
+            </div>
+
+            <!-- Submitted State -->
+            <div x-show="state === 'submitted'" x-cloak class="mt-6 text-center">
+                <p class="text-green-400 text-xl font-bold mb-4">Score submitted!</p>
+                <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                    <button @click="reset()" class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-lg transition">
+                        Play Again
+                    </button>
+                    <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='tile-game' %}" class="px-6 py-3 bg-white/20 hover:bg-white/30 text-white font-bold rounded-lg transition text-center">
+                        View Leaderboard
+                    </a>
+                </div>
+            </div>
+
+            <!-- Error State -->
+            <div x-show="error && state === 'finished'" x-cloak class="mt-6 text-center">
+                <p class="text-red-400 mb-4" x-text="error"></p>
+                <button @click="reset()" class="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-bold rounded-lg transition">
+                    Try Again
+                </button>
+            </div>
+        </div>
+
+        <!-- Leaderboard Preview -->
+        <div class="mt-8 bg-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/20">
+            <h2 class="text-xl font-bold text-white mb-4">Top Scores</h2>
+            <div id="leaderboard" x-data="leaderboardPreview('mini-games', 'tile-game')" x-init="fetchScores()">
+                <div x-show="loading" class="text-indigo-200">Loading...</div>
+                <div x-show="!loading && scores.length === 0" class="text-indigo-200">No scores yet. Be the first!</div>
+                <ul x-show="!loading && scores.length > 0" class="space-y-2">
+                    <template x-for="(s, i) in scores" :key="i">
+                        <li class="flex justify-between items-center py-2 px-4 rounded-lg" :class="i < 3 ? 'bg-white/10' : ''">
+                            <div class="flex items-center gap-3">
+                                <span class="text-indigo-300 font-mono w-6" x-text="'#' + s.rank"></span>
+                                <span class="text-white" x-text="s.player_name"></span>
+                            </div>
+                            <span class="text-green-400 font-bold" x-text="s.score.toFixed(2) + 's'"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Leaderboard Link -->
+        <p class="mt-4 text-center text-indigo-300 text-sm">
+            <a href="{% url 'public_leaderboard' game_slug='mini-games' leaderboard_slug='tile-game' %}" class="hover:text-white transition underline">View full leaderboard</a>
+        </p>
+    </div>
+</div>
+
+<script>
+function getPlayerId() {
+    let playerId = localStorage.getItem('scores_player_id');
+    if (!playerId) {
+        playerId = crypto.randomUUID();
+        localStorage.setItem('scores_player_id', playerId);
+    }
+    return playerId;
+}
+
+function getSavedPlayerName() {
+    return localStorage.getItem('scores_player_name') || '';
+}
+
+function savePlayerName(name) {
+    localStorage.setItem('scores_player_name', name);
+}
+
+function tileGame() {
+    return {
+        state: 'ready', // ready, playing, finished, submitting, submitted
+        tiles: [],
+        score: 0,
+        currentTime: 0,
+        playerName: getSavedPlayerName(),
+        error: null,
+        startTime: null,
+        timerInterval: null,
+        apiToken: 'demo_tile_game_public_token_v1',
+
+        init() {
+            this.shuffleTiles();
+        },
+
+        shuffleTiles() {
+            // Start with solved puzzle
+            this.tiles = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+
+            // Make random valid moves to shuffle (ensures solvability)
+            for (let i = 0; i < 50; i++) {
+                const emptyIndex = this.tiles.indexOf(0);
+                const neighbors = this.getNeighbors(emptyIndex);
+                const randomNeighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
+                this.tiles[emptyIndex] = this.tiles[randomNeighbor];
+                this.tiles[randomNeighbor] = 0;
+            }
+        },
+
+        getNeighbors(index) {
+            const neighbors = [];
+            const row = Math.floor(index / 3);
+            const col = index % 3;
+
+            if (row > 0) neighbors.push(index - 3); // up
+            if (row < 2) neighbors.push(index + 3); // down
+            if (col > 0) neighbors.push(index - 1); // left
+            if (col < 2) neighbors.push(index + 1); // right
+
+            return neighbors;
+        },
+
+        moveTile(index) {
+            if (this.state === 'finished' || this.state === 'submitting' || this.state === 'submitted') return;
+            if (this.tiles[index] === 0) return;
+
+            const emptyIndex = this.tiles.indexOf(0);
+            const clickedRow = Math.floor(index / 3);
+            const clickedCol = index % 3;
+            const emptyRow = Math.floor(emptyIndex / 3);
+            const emptyCol = emptyIndex % 3;
+
+            let canMove = false;
+
+            // Check if clicked tile is in same row or column as empty
+            if (clickedRow === emptyRow && clickedCol !== emptyCol) {
+                // Same row - slide tiles horizontally
+                canMove = true;
+                if (clickedCol < emptyCol) {
+                    // Slide right: move tiles from clicked to empty-1
+                    for (let c = emptyCol; c > clickedCol; c--) {
+                        this.tiles[clickedRow * 3 + c] = this.tiles[clickedRow * 3 + c - 1];
+                    }
+                } else {
+                    // Slide left: move tiles from clicked to empty+1
+                    for (let c = emptyCol; c < clickedCol; c++) {
+                        this.tiles[clickedRow * 3 + c] = this.tiles[clickedRow * 3 + c + 1];
+                    }
+                }
+                this.tiles[index] = 0;
+            } else if (clickedCol === emptyCol && clickedRow !== emptyRow) {
+                // Same column - slide tiles vertically
+                canMove = true;
+                if (clickedRow < emptyRow) {
+                    // Slide down: move tiles from clicked to empty-1
+                    for (let r = emptyRow; r > clickedRow; r--) {
+                        this.tiles[r * 3 + clickedCol] = this.tiles[(r - 1) * 3 + clickedCol];
+                    }
+                } else {
+                    // Slide up: move tiles from clicked to empty+1
+                    for (let r = emptyRow; r < clickedRow; r++) {
+                        this.tiles[r * 3 + clickedCol] = this.tiles[(r + 1) * 3 + clickedCol];
+                    }
+                }
+                this.tiles[index] = 0;
+            }
+
+            if (canMove) {
+                // Start timer on first move
+                if (this.state === 'ready') {
+                    this.state = 'playing';
+                    this.startTime = performance.now();
+                    this.timerInterval = setInterval(() => {
+                        this.currentTime = (performance.now() - this.startTime) / 1000;
+                    }, 10);
+                }
+
+                // Check for win
+                if (this.isSolved()) {
+                    this.finish();
+                }
+            }
+        },
+
+        isSolved() {
+            for (let i = 0; i < 8; i++) {
+                if (this.tiles[i] !== i + 1) return false;
+            }
+            return this.tiles[8] === 0;
+        },
+
+        finish() {
+            clearInterval(this.timerInterval);
+            this.score = (performance.now() - this.startTime) / 1000;
+            this.currentTime = this.score;
+            this.state = 'finished';
+        },
+
+        async submitScore() {
+            if (!this.playerName.trim()) return;
+
+            this.state = 'submitting';
+            this.error = null;
+            savePlayerName(this.playerName.trim());
+
+            try {
+                const response = await fetch('/api/v1/scores/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + this.apiToken
+                    },
+                    body: JSON.stringify({
+                        player_name: this.playerName.trim(),
+                        score: Math.round(this.score * 100) / 100, // Round to 2 decimal places
+                        player_id: getPlayerId()
+                    })
+                });
+
+                if (response.ok) {
+                    this.state = 'submitted';
+                    // Refresh leaderboard
+                    const leaderboardEl = document.querySelector('#leaderboard');
+                    if (leaderboardEl && leaderboardEl._x_dataStack) {
+                        leaderboardEl._x_dataStack[0].fetchScores();
+                    }
+                } else {
+                    const data = await response.json();
+                    this.error = data.error || 'Failed to submit score';
+                    this.state = 'finished';
+                }
+            } catch (e) {
+                this.error = 'Network error. Please try again.';
+                this.state = 'finished';
+            }
+        },
+
+        reset() {
+            this.state = 'ready';
+            this.score = 0;
+            this.currentTime = 0;
+            this.error = null;
+            this.startTime = null;
+            clearInterval(this.timerInterval);
+            this.shuffleTiles();
+        }
+    };
+}
+
+function leaderboardPreview(gameSlug, leaderboardSlug) {
+    return {
+        scores: [],
+        loading: true,
+
+        async fetchScores() {
+            this.loading = true;
+            try {
+                const response = await fetch(`/api/v1/scores/${gameSlug}/${leaderboardSlug}/?limit=10`);
+                if (response.ok) {
+                    const data = await response.json();
+                    this.scores = data.scores;
+                }
+            } catch (e) {
+                console.error('Failed to fetch scores:', e);
+            }
+            this.loading = false;
+        }
+    };
+}
+</script>
+{% endblock %}
