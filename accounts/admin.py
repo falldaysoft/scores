@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import User
+from .models import User, WebAuthnCredential
 
 
 class UserAdmin(BaseUserAdmin):
@@ -21,6 +21,13 @@ class UserAdmin(BaseUserAdmin):
             'fields': ('email', 'password1', 'password2'),
         }),
     )
+
+
+@admin.register(WebAuthnCredential)
+class WebAuthnCredentialAdmin(admin.ModelAdmin):
+    list_display = ('name', 'user', 'sign_count', 'created_at', 'last_used_at')
+    search_fields = ('user__email', 'name')
+    readonly_fields = ('credential_id', 'public_key', 'created_at', 'last_used_at')
 
 
 admin.site.register(User, UserAdmin)

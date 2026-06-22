@@ -89,7 +89,7 @@ class ResendVerificationView(View):
 class AccountSettingsView(LoginRequiredMixin, View):
     def get(self, request):
         form = AccountSettingsForm(instance=request.user)
-        return render(request, 'accounts/settings.html', {'form': form})
+        return render(request, 'accounts/settings.html', self._context(request, form))
 
     def post(self, request):
         form = AccountSettingsForm(request.POST, instance=request.user)
@@ -97,7 +97,13 @@ class AccountSettingsView(LoginRequiredMixin, View):
             form.save()
             messages.success(request, 'Account settings updated.')
             return redirect('accounts:settings')
-        return render(request, 'accounts/settings.html', {'form': form})
+        return render(request, 'accounts/settings.html', self._context(request, form))
+
+    def _context(self, request, form):
+        return {
+            'form': form,
+            'passkeys': request.user.passkeys.all(),
+        }
 
 
 class AccountDeleteView(LoginRequiredMixin, View):

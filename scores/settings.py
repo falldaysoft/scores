@@ -107,6 +107,14 @@ AUTH_PASSWORD_VALIDATORS = [
 # Custom user model
 AUTH_USER_MODEL = 'accounts.User'
 
+# WebAuthn / Passkeys
+# RP ID must be the site's registrable domain (no scheme/port). Defaults to the
+# SITE_URL host (localhost in dev, which browsers treat as a secure context).
+WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID', _site_host or 'localhost')
+WEBAUTHN_RP_NAME = os.environ.get('WEBAUTHN_RP_NAME', 'Scores')
+# Expected origin(s) for assertions, e.g. https://scores.example.com (with port in dev).
+WEBAUTHN_ORIGIN = os.environ.get('WEBAUTHN_ORIGIN', SITE_URL)
+
 # Internationalization
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'

@@ -1,5 +1,11 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Login{% endblock %}
+
+{% block extra_head %}
+<script src="https://unpkg.com/@simplewebauthn/browser@13.1.0/dist/bundle/index.umd.min.js"></script>
+<script defer src="{% static 'js/passkeys.js' %}"></script>
+{% endblock %}
 
 {% block content %}
 <div class="flex min-h-[calc(100vh-64px)] items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -39,6 +45,22 @@
                     Sign In
                 </button>
             </form>
+
+            <div x-data="{ error: '', busy: false }" class="mt-6">
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>
+                    <div class="relative flex justify-center text-sm"><span class="bg-white px-2 text-gray-500">or</span></div>
+                </div>
+
+                <button type="button"
+                        :disabled="busy"
+                        @click="error = ''; busy = true; loginWithPasskey('{% url 'accounts:passkey_login_begin' %}', '{% url 'accounts:passkey_login_complete' %}').then(function(r){ window.location = (r && r.redirect) || '{% url 'games:dashboard' %}'; }).catch(function(e){ error = e.message || 'Passkey sign-in failed.'; busy = false; })"
+                        class="mt-6 w-full flex items-center justify-center gap-2 border border-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors disabled:opacity-60">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a4 4 0 11-8 0 4 4 0 018 0zM9 11a4 4 0 00-4 4v2h6m4-3l2 2 4-4"></path></svg>
+                    <span x-text="busy ? 'Waiting for passkey…' : 'Sign in with a passkey'"></span>
+                </button>
+                <p x-show="error" x-cloak class="mt-2 text-sm text-red-600" x-text="error"></p>
+            </div>
 
             <p class="mt-6 text-center text-sm text-gray-600">
                 Don't have an account?

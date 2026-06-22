@@ -15,3 +15,11 @@ PASSWORD_HASHERS = [
 
 # Disable email sending in tests
 EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
+
+# Avoid requiring a collectstatic manifest when templates use {% static %}.
+STORAGES = {
+    **STORAGES,
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage',
+    },
+}
