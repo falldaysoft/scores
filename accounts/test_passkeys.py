@@ -1,10 +1,17 @@
 """Tests for WebAuthn passkey registration and login.
 
-The end-to-end ceremony tests use `soft-webauthn` (a software authenticator).
-They are skipped if that package isn't installed; the non-crypto branch tests
-always run.
+The end-to-end ceremony tests drive a minimal in-process software
+authenticator (`SoftAuthenticator`) built on `cryptography` + `cbor2` — both
+already runtime dependencies — so no extra test packages are required.
 """
+import hashlib
 import json
+import os
+from struct import pack
+
+import cbor2
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec
 
 from django.test import TestCase, Client
 from django.urls import reverse
@@ -13,79 +20,94 @@ from webauthn.helpers import base64url_to_bytes, bytes_to_base64url
 
 from .models import User, WebAuthnCredential
 
-try:
-    from soft_webauthn import SoftWebauthnDevice
-    HAS_SOFT_WEBAUTHN = True
-except ImportError:  # pragma: no cover
-    HAS_SOFT_WEBAUTHN = False
-
 ORIGIN = 'http://localhost:8000'
 
 
-def _creation_options_for_device(options_json):
-    """Convert our begin-registration JSON into soft-webauthn's create() input."""
-    pk = {
-        'rp': options_json['rp'],
-        'user': {
-            'id': base64url_to_bytes(options_json['user']['id']),
-            'name': options_json['user']['name'],
-            'displayName': options_json['user']['displayName'],
-        },
-        'challenge': base64url_to_bytes(options_json['challenge']),
-        'pubKeyCredParams': options_json['pubKeyCredParams'],
-        'attestation': options_json.get('attestation', 'none'),
-    }
-    if options_json.get('excludeCredentials'):
-        pk['excludeCredentials'] = [
-            {'type': c['type'], 'id': base64url_to_bytes(c['id'])}
-            for c in options_json['excludeCredentials']
-        ]
-    return {'publicKey': pk}
+class SoftAuthenticator:
+    """A minimal ES256 software authenticator producing SimpleWebAuthn-shaped JSON."""
 
+    AAGUID = b'\x00' * 16
 
-def _request_options_for_device(options_json):
-    """Convert our begin-login JSON into soft-webauthn's get() input."""
-    pk = {
-        'challenge': base64url_to_bytes(options_json['challenge']),
-        'rpId': options_json['rpId'],
-        'userVerification': options_json.get('userVerification', 'preferred'),
-    }
-    if options_json.get('allowCredentials'):
-        pk['allowCredentials'] = [
-            {'type': c['type'], 'id': base64url_to_bytes(c['id'])}
-            for c in options_json['allowCredentials']
-        ]
-    return {'publicKey': pk}
+    def __init__(self):
+        self.credential_id = os.urandom(32)
+        self.private_key = ec.generate_private_key(ec.SECP256R1())
+        self.rp_id = None
+        self.user_handle = None
+        self.sign_count = 0
 
+    def _cose_public_key(self):
+        nums = self.private_key.public_key().public_numbers()
+        # COSE_Key for ES256: kty=EC2(2), alg=ES256(-7), crv=P-256(1), x, y
+        return cbor2.dumps({
+            1: 2,
+            3: -7,
+            -1: 1,
+            -2: nums.x.to_bytes(32, 'big'),
+            -3: nums.y.to_bytes(32, 'big'),
+        })
 
-def _attestation_to_json(att):
-    return {
-        'id': bytes_to_base64url(att['rawId']),
-        'rawId': bytes_to_base64url(att['rawId']),
-        'response': {
-            'clientDataJSON': bytes_to_base64url(att['response']['clientDataJSON']),
-            'attestationObject': bytes_to_base64url(att['response']['attestationObject']),
-            'transports': ['internal'],
-        },
-        'type': att['type'],
-        'clientExtensionResults': {},
-    }
+    def create(self, options, origin=ORIGIN):
+        """Build an attestation response for a registration options dict."""
+        self.rp_id = options['rp']['id']
+        self.user_handle = base64url_to_bytes(options['user']['id'])
+        client_data = json.dumps({
+            'type': 'webauthn.create',
+            'challenge': options['challenge'],
+            'origin': origin,
+        }).encode()
 
+        rp_id_hash = hashlib.sha256(self.rp_id.encode()).digest()
+        flags = b'\x45'  # UP | UV | AT
+        cose_key = self._cose_public_key()
+        auth_data = (
+            rp_id_hash + flags + pack('>I', self.sign_count)
+            + self.AAGUID + pack('>H', len(self.credential_id))
+            + self.credential_id + cose_key
+        )
+        attestation_object = cbor2.dumps({
+            'fmt': 'none',
+            'attStmt': {},
+            'authData': auth_data,
+        })
+        return {
+            'id': bytes_to_base64url(self.credential_id),
+            'rawId': bytes_to_base64url(self.credential_id),
+            'response': {
+                'clientDataJSON': bytes_to_base64url(client_data),
+                'attestationObject': bytes_to_base64url(attestation_object),
+                'transports': ['internal'],
+            },
+            'type': 'public-key',
+            'clientExtensionResults': {},
+        }
 
-def _assertion_to_json(ass):
-    user_handle = ass['response'].get('userHandle')
-    return {
-        'id': bytes_to_base64url(ass['rawId']),
-        'rawId': bytes_to_base64url(ass['rawId']),
-        'response': {
-            'authenticatorData': bytes_to_base64url(ass['response']['authenticatorData']),
-            'clientDataJSON': bytes_to_base64url(ass['response']['clientDataJSON']),
-            'signature': bytes_to_base64url(ass['response']['signature']),
-            'userHandle': bytes_to_base64url(user_handle) if user_handle else None,
-        },
-        'type': ass['type'],
-        'clientExtensionResults': {},
-    }
+    def get(self, options, origin=ORIGIN):
+        """Build an assertion response for an authentication options dict."""
+        self.sign_count += 1
+        client_data = json.dumps({
+            'type': 'webauthn.get',
+            'challenge': options['challenge'],
+            'origin': origin,
+        }).encode()
+        rp_id_hash = hashlib.sha256(options['rpId'].encode()).digest()
+        flags = b'\x05'  # UP | UV
+        auth_data = rp_id_hash + flags + pack('>I', self.sign_count)
+        signature = self.private_key.sign(
+            auth_data + hashlib.sha256(client_data).digest(),
+            ec.ECDSA(hashes.SHA256()),
+        )
+        return {
+            'id': bytes_to_base64url(self.credential_id),
+            'rawId': bytes_to_base64url(self.credential_id),
+            'response': {
+                'authenticatorData': bytes_to_base64url(auth_data),
+                'clientDataJSON': bytes_to_base64url(client_data),
+                'signature': bytes_to_base64url(signature),
+                'userHandle': bytes_to_base64url(self.user_handle) if self.user_handle else None,
+            },
+            'type': 'public-key',
+            'clientExtensionResults': {},
+        }
 
 
 class WebAuthnModelTest(TestCase):
@@ -207,26 +229,24 @@ class PasskeyDeleteViewTest(TestCase):
 
 
 class PasskeyEndToEndTest(TestCase):
-    """Full register + login ceremony against a software authenticator."""
+    """Full register + login ceremony against the software authenticator."""
 
     def setUp(self):
-        if not HAS_SOFT_WEBAUTHN:
-            self.skipTest('soft-webauthn not installed')
         self.client = Client()
         self.user = User.objects.create_user(email='e2e@example.com', password='pw123456')
 
     def _register(self, device, name='Test key'):
         self.client.login(username='e2e@example.com', password='pw123456')
         begin = self.client.post(reverse('accounts:passkey_register_begin')).json()
-        attestation = device.create(_creation_options_for_device(begin), ORIGIN)
+        attestation = device.create(begin)
         return self.client.post(
             reverse('accounts:passkey_register_complete'),
-            data=json.dumps({'credential': _attestation_to_json(attestation), 'name': name}),
+            data=json.dumps({'credential': attestation, 'name': name}),
             content_type='application/json',
         )
 
     def test_register_then_login(self):
-        device = SoftWebauthnDevice()
+        device = SoftAuthenticator()
 
         # --- Registration (authenticated) ---
         resp = self._register(device, name='My YubiKey')
@@ -235,16 +255,17 @@ class PasskeyEndToEndTest(TestCase):
         cred = WebAuthnCredential.objects.get(user=self.user)
         self.assertEqual(cred.name, 'My YubiKey')
         self.assertEqual(cred.sign_count, 0)
+        self.assertEqual(cred.transports, ['internal'])
 
         # Log out before testing passkey login.
         self.client.logout()
 
         # --- Login (anonymous, usernameless) ---
         begin = self.client.post(reverse('accounts:passkey_login_begin')).json()
-        assertion = device.get(_request_options_for_device(begin), ORIGIN)
+        assertion = device.get(begin)
         resp = self.client.post(
             reverse('accounts:passkey_login_complete'),
-            data=json.dumps(_assertion_to_json(assertion)),
+            data=json.dumps(assertion),
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 200, resp.content)
@@ -259,23 +280,17 @@ class PasskeyEndToEndTest(TestCase):
         self.assertIsNotNone(cred.last_used_at)
 
     def test_login_fails_with_tampered_challenge(self):
-        device = SoftWebauthnDevice()
+        device = SoftAuthenticator()
         self._register(device)
         self.client.logout()
 
         self.client.post(reverse('accounts:passkey_login_begin'))
-        # Authenticate against a *different* challenge than the server stored.
-        forged = {
-            'publicKey': {
-                'challenge': b'not-the-real-challenge',
-                'rpId': 'localhost',
-                'userVerification': 'preferred',
-            }
-        }
-        assertion = device.get(forged, ORIGIN)
+        # Sign a *different* challenge than the server stored.
+        forged = {'rpId': 'localhost', 'challenge': bytes_to_base64url(b'not-the-real-challenge')}
+        assertion = device.get(forged)
         resp = self.client.post(
             reverse('accounts:passkey_login_complete'),
-            data=json.dumps(_assertion_to_json(assertion)),
+            data=json.dumps(assertion),
             content_type='application/json',
         )
         self.assertEqual(resp.status_code, 400)

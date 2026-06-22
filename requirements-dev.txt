@@ -1,5 +1,0 @@
-# Test-only dependencies (not needed at runtime).
--r requirements.txt
-
-# Software WebAuthn authenticator for end-to-end passkey ceremony tests.
-soft-webauthn==0.1.4
