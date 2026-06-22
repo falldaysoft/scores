@@ -1,10 +1,46 @@
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from django.utils import timezone
 from django.shortcuts import get_object_or_404
 
 from leaderboards.models import Leaderboard, Score
+
+
+def _parse_period(request):
+    """Read the ?period=<int> query param (periods back, 0=current). Clamp invalid to 0."""
+    try:
+        return max(0, int(request.query_params.get('period', 0)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _leaderboard_payload(leaderboard, scores, offset, period_offset):
+    """Build the JSON response shared by the authenticated and public GET endpoints."""
+    period_start, period_end = leaderboard.get_period_bounds(period_offset)
+    return {
+        'leaderboard': {
+            'name': leaderboard.name,
+            'game': leaderboard.game.name,
+            'sort_order': leaderboard.sort_order,
+            'type': leaderboard.leaderboard_type,
+            'show_score': leaderboard.show_score,
+            'show_date': leaderboard.show_date,
+            'reset_period': leaderboard.reset_period,
+            'period_offset': period_offset,
+            'period_start': period_start.isoformat() if period_start else None,
+            'period_end': period_end.isoformat() if period_end else None,
+        },
+        'scores': [
+            {
+                'rank': offset + i + 1,
+                'player_name': s.player_name,
+                'score': s.score,
+                'metadata': s.metadata,
+                'created_at': s.created_at.isoformat(),
+            }
+            for i, s in enumerate(scores)
+        ]
+    }
 
 
 class ScoreAPIView(APIView):
@@ -80,14 +116,20 @@ class ScoreAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # If player_id provided, update existing score or create new one
+        # If player_id provided, update existing score or create new one.
+        # For period boards, dedup is scoped to the current period so a returning
+        # player gets a fresh entry each day/week instead of updating an old one.
         created = False
         updated = False
         if player_id:
-            existing_score = Score.objects.filter(
+            existing_qs = Score.objects.filter(
                 leaderboard=leaderboard,
                 player_id=player_id
-            ).first()
+            )
+            if leaderboard.reset_period != 'none':
+                start, end = leaderboard.get_period_bounds(0)
+                existing_qs = existing_qs.filter(created_at__gte=start, created_at__lt=end)
+            existing_score = existing_qs.first()
         else:
             existing_score = None
 
@@ -156,39 +198,10 @@ class ScoreAPIView(APIView):
 
         limit = min(int(request.query_params.get('limit', 100)), 100)
         offset = int(request.query_params.get('offset', 0))
+        period_offset = _parse_period(request)
 
-        scores = leaderboard.scores.filter(expires_at__gt=timezone.now())
-        if leaderboard.sort_order == 'asc':
-            scores = scores.order_by('score')
-        elif leaderboard.sort_order == 'newest':
-            scores = scores.order_by('-created_at')
-        elif leaderboard.sort_order == 'oldest':
-            scores = scores.order_by('created_at')
-        else:
-            scores = scores.order_by('-score')
-
-        scores = scores[offset:offset + limit]
-
-        return Response({
-            'leaderboard': {
-                'name': leaderboard.name,
-                'game': leaderboard.game.name,
-                'sort_order': leaderboard.sort_order,
-                'type': leaderboard.leaderboard_type,
-                'show_score': leaderboard.show_score,
-                'show_date': leaderboard.show_date,
-            },
-            'scores': [
-                {
-                    'rank': offset + i + 1,
-                    'player_name': s.player_name,
-                    'score': s.score,
-                    'metadata': s.metadata,
-                    'created_at': s.created_at.isoformat(),
-                }
-                for i, s in enumerate(scores)
-            ]
-        })
+        scores = leaderboard.get_ordered_scores(period_offset)[offset:offset + limit]
+        return Response(_leaderboard_payload(leaderboard, scores, offset, period_offset))
 
 
 class PublicScoreAPIView(APIView):
@@ -203,36 +216,7 @@ class PublicScoreAPIView(APIView):
 
         limit = min(int(request.query_params.get('limit', 100)), 100)
         offset = int(request.query_params.get('offset', 0))
+        period_offset = _parse_period(request)
 
-        scores = leaderboard.scores.filter(expires_at__gt=timezone.now())
-        if leaderboard.sort_order == 'asc':
-            scores = scores.order_by('score')
-        elif leaderboard.sort_order == 'newest':
-            scores = scores.order_by('-created_at')
-        elif leaderboard.sort_order == 'oldest':
-            scores = scores.order_by('created_at')
-        else:
-            scores = scores.order_by('-score')
-
-        scores = scores[offset:offset + limit]
-
-        return Response({
-            'leaderboard': {
-                'name': leaderboard.name,
-                'game': leaderboard.game.name,
-                'sort_order': leaderboard.sort_order,
-                'type': leaderboard.leaderboard_type,
-                'show_score': leaderboard.show_score,
-                'show_date': leaderboard.show_date,
-            },
-            'scores': [
-                {
-                    'rank': offset + i + 1,
-                    'player_name': s.player_name,
-                    'score': s.score,
-                    'metadata': s.metadata,
-                    'created_at': s.created_at.isoformat(),
-                }
-                for i, s in enumerate(scores)
-            ]
-        })
+        scores = leaderboard.get_ordered_scores(period_offset)[offset:offset + limit]
+        return Response(_leaderboard_payload(leaderboard, scores, offset, period_offset))

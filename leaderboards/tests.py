@@ -86,6 +86,51 @@ class ScoreModelTest(TestCase):
         self.assertTrue(Score.objects.filter(pk=active_score.pk).exists())
 
 
+class ResetPeriodTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(email='period@example.com', password='testpass123')
+        self.game = Game.objects.create(owner=self.user, name='Period Game')
+
+    def test_daily_bounds_are_one_utc_day(self):
+        board = Leaderboard.objects.create(game=self.game, name='Daily', reset_period='daily')
+        start, end = board.get_period_bounds(0)
+        self.assertEqual((start.hour, start.minute, start.second), (0, 0, 0))
+        self.assertEqual(end - start, timedelta(days=1))
+        # Previous period sits exactly one day earlier.
+        prev_start, _ = board.get_period_bounds(1)
+        self.assertEqual(start - prev_start, timedelta(days=1))
+
+    def test_weekly_bounds_start_monday(self):
+        board = Leaderboard.objects.create(game=self.game, name='Weekly', reset_period='weekly')
+        start, end = board.get_period_bounds(0)
+        self.assertEqual(start.weekday(), 0)  # Monday
+        self.assertEqual((start.hour, start.minute, start.second), (0, 0, 0))
+        self.assertEqual(end - start, timedelta(weeks=1))
+
+    def test_lifetime_bounds_are_none(self):
+        board = Leaderboard.objects.create(game=self.game, name='Lifetime', reset_period='none')
+        self.assertEqual(board.get_period_bounds(0), (None, None))
+
+    def test_period_score_has_no_expiry_and_survives_cleanup(self):
+        board = Leaderboard.objects.create(game=self.game, name='Daily', reset_period='daily')
+        score = Score.objects.create(leaderboard=board, player_name='P1', score=100)
+        self.assertIsNone(score.expires_at)
+        deleted_count, _ = Score.cleanup_expired()
+        self.assertEqual(deleted_count, 0)
+        self.assertTrue(Score.objects.filter(pk=score.pk).exists())
+
+    def test_get_ordered_scores_filters_to_current_period(self):
+        board = Leaderboard.objects.create(game=self.game, name='Daily', reset_period='daily')
+        today = Score.objects.create(leaderboard=board, player_name='Today', score=100)
+        old = Score.objects.create(leaderboard=board, player_name='Old', score=100)
+        Score.objects.filter(pk=old.pk).update(created_at=timezone.now() - timedelta(days=1))
+
+        current = list(board.get_ordered_scores())
+        self.assertEqual(current, [today])
+        previous = list(board.get_ordered_scores(period_offset=1))
+        self.assertEqual([s.pk for s in previous], [old.pk])
+
+
 class LeaderboardViewTest(TestCase):
     def setUp(self):
         self.client = Client()

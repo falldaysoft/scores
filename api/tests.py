@@ -1,5 +1,8 @@
+from datetime import timedelta
+
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APIClient
 from accounts.models import User
 from games.models import Game
@@ -613,6 +616,85 @@ class PublicScoreAPITest(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertNotIn('player_id', response.data['scores'][0])
+
+
+class DailyLeaderboardAPITest(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.user = User.objects.create_user(email='daily@example.com', password='testpass123')
+        self.game = Game.objects.create(owner=self.user, name='Daily Game')
+        self.board = Leaderboard.objects.create(
+            game=self.game, name='Daily Board', reset_period='daily'
+        )
+
+    def _post(self, **data):
+        return self.client.post(
+            reverse('api:scores'), data, format='json',
+            HTTP_AUTHORIZATION=f'Bearer {self.board.api_token}'
+        )
+
+    def _backdate(self, score, days):
+        # created_at is auto_now_add, so move it into a prior period directly.
+        Score.objects.filter(pk=score.pk).update(
+            created_at=timezone.now() - timedelta(days=days)
+        )
+
+    def test_period_board_score_never_expires(self):
+        self._post(player_name='P1', score=100)
+        self.assertIsNone(Score.objects.get().expires_at)
+
+    def test_same_day_same_player_keeps_best(self):
+        self._post(player_name='P1', player_id='u1', score=100)
+        resp = self._post(player_name='P1', player_id='u1', score=250)
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(Score.objects.count(), 1)
+        self.assertEqual(Score.objects.get().score, 250)
+
+    def test_new_day_creates_fresh_entry(self):
+        self._post(player_name='P1', player_id='u1', score=100)
+        self._backdate(Score.objects.get(), days=1)
+        # Same player, new day -> a second row, yesterday's untouched.
+        resp = self._post(player_name='P1', player_id='u1', score=50)
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(Score.objects.count(), 2)
+
+    def test_get_default_returns_only_current_period(self):
+        self._post(player_name='Today', score=100)
+        old = self._post(player_name='Yesterday', score=999)
+        self._backdate(Score.objects.get(player_name='Yesterday'), days=1)
+
+        resp = self.client.get(
+            reverse('api:scores'), HTTP_AUTHORIZATION=f'Bearer {self.board.api_token}'
+        )
+        names = [s['player_name'] for s in resp.data['scores']]
+        self.assertEqual(names, ['Today'])
+        self.assertEqual(resp.data['leaderboard']['reset_period'], 'daily')
+        self.assertEqual(resp.data['leaderboard']['period_offset'], 0)
+        self.assertIsNotNone(resp.data['leaderboard']['period_start'])
+
+    def test_get_previous_period(self):
+        self._post(player_name='Today', score=100)
+        self._post(player_name='Yesterday', score=999)
+        self._backdate(Score.objects.get(player_name='Yesterday'), days=1)
+
+        resp = self.client.get(
+            reverse('api:scores') + '?period=1',
+            HTTP_AUTHORIZATION=f'Bearer {self.board.api_token}'
+        )
+        names = [s['player_name'] for s in resp.data['scores']]
+        self.assertEqual(names, ['Yesterday'])
+
+    def test_public_get_previous_period(self):
+        self._post(player_name='Today', score=100)
+        self._post(player_name='Yesterday', score=999)
+        self._backdate(Score.objects.get(player_name='Yesterday'), days=1)
+
+        url = reverse('api:public_scores', kwargs={
+            'game_slug': self.game.slug, 'leaderboard_slug': self.board.slug
+        })
+        resp = self.client.get(url + '?period=1')
+        names = [s['player_name'] for s in resp.data['scores']]
+        self.assertEqual(names, ['Yesterday'])
 
 
 class CorrectAnswerLeaderboardTest(TestCase):

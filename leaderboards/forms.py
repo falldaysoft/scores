@@ -5,8 +5,8 @@ from .models import Leaderboard
 class LeaderboardForm(forms.ModelForm):
     class Meta:
         model = Leaderboard
-        fields = ['name', 'description', 'leaderboard_type', 'correct_answer', 'sort_order', 'show_score', 'show_date',
-                  'min_scores_to_keep', 'max_scores']
+        fields = ['name', 'description', 'leaderboard_type', 'correct_answer', 'sort_order', 'reset_period',
+                  'show_score', 'show_date', 'min_scores_to_keep', 'max_scores']
         widgets = {
             'name': forms.TextInput(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
@@ -26,6 +26,9 @@ class LeaderboardForm(forms.ModelForm):
                 'placeholder': 'The correct answer',
             }),
             'sort_order': forms.Select(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
+            }),
+            'reset_period': forms.Select(attrs={
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent',
             }),
             'show_score': forms.CheckboxInput(attrs={
@@ -48,10 +51,15 @@ class LeaderboardForm(forms.ModelForm):
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        # Optional so submissions that omit it fall back to the model default ('none').
+        self.fields['reset_period'].required = False
         # Only show retention fields to users with can_customize permission
         if not user or not user.can_customize:
             self.fields.pop('min_scores_to_keep', None)
             self.fields.pop('max_scores', None)
+
+    def clean_reset_period(self):
+        return self.cleaned_data.get('reset_period') or 'none'
 
     def clean(self):
         cleaned_data = super().clean()

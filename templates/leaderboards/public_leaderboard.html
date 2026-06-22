@@ -11,8 +11,24 @@
         <p class="mt-4 text-lg text-gray-600">{{ leaderboard.description }}</p>
         {% endif %}
         <p class="mt-2 text-sm text-gray-500">
-            {{ leaderboard.get_sort_order_display }} &bull; Scores expire after 7 days
+            {{ leaderboard.get_sort_order_display }}
+            {% if leaderboard.reset_period == 'none' %}
+            &bull; Scores expire after 7 days
+            {% else %}
+            &bull; {{ leaderboard.get_reset_period_display }} &bull;
+            {% if period_offset == 0 %}{% if leaderboard.reset_period == 'daily' %}Today{% else %}This week{% endif %}{% else %}{{ period_start|date:'M j, Y' }}{% endif %}
+            {% endif %}
         </p>
+        {% if leaderboard.reset_period != 'none' %}
+        <div class="mt-3 flex items-center justify-center gap-4 text-sm">
+            <a href="?period={{ period_offset|add:1 }}" class="text-indigo-600 hover:underline">&larr; Previous</a>
+            {% if period_offset > 0 %}
+            <a href="?period={{ period_offset|add:-1 }}" class="text-indigo-600 hover:underline">Next &rarr;</a>
+            {% else %}
+            <span class="text-gray-300">Next &rarr;</span>
+            {% endif %}
+        </div>
+        {% endif %}
         {% if game.url %}
         <a href="{{ game.url }}" class="inline-block mt-4 text-indigo-600 hover:underline text-sm">Back to Game</a>
         {% endif %}

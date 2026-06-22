@@ -3,7 +3,6 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.views import View
 from django.http import HttpResponse
-from django.utils import timezone
 
 from games.models import Game
 from .models import Leaderboard, Score
@@ -31,19 +30,11 @@ class LeaderboardDetailView(LoginRequiredMixin, View):
     def get(self, request, game_slug, leaderboard_slug):
         game = get_object_or_404(Game, slug=game_slug, owner=request.user)
         leaderboard = get_object_or_404(Leaderboard, slug=leaderboard_slug, game=game)
-        scores = leaderboard.scores.filter(expires_at__gt=timezone.now())
-        if leaderboard.sort_order == 'asc':
-            scores = scores.order_by('score')
-        elif leaderboard.sort_order == 'newest':
-            scores = scores.order_by('-created_at')
-        elif leaderboard.sort_order == 'oldest':
-            scores = scores.order_by('created_at')
-        else:
-            scores = scores.order_by('-score')
+        scores = leaderboard.get_ordered_scores()[:100]
         return render(request, 'leaderboards/leaderboard_detail.html', {
             'game': game,
             'leaderboard': leaderboard,
-            'scores': scores[:100],
+            'scores': scores,
         })
 
 
@@ -132,17 +123,16 @@ class PublicLeaderboardView(View):
     def get(self, request, game_slug, leaderboard_slug):
         game = get_object_or_404(Game, slug=game_slug)
         leaderboard = get_object_or_404(Leaderboard, slug=leaderboard_slug, game=game)
-        scores = leaderboard.scores.filter(expires_at__gt=timezone.now())
-        if leaderboard.sort_order == 'asc':
-            scores = scores.order_by('score')
-        elif leaderboard.sort_order == 'newest':
-            scores = scores.order_by('-created_at')
-        elif leaderboard.sort_order == 'oldest':
-            scores = scores.order_by('created_at')
-        else:
-            scores = scores.order_by('-score')
+        try:
+            period_offset = max(0, int(request.GET.get('period', 0)))
+        except (TypeError, ValueError):
+            period_offset = 0
+        scores = leaderboard.get_ordered_scores(period_offset)[:100]
+        period_start, _ = leaderboard.get_period_bounds(period_offset)
         return render(request, 'leaderboards/public_leaderboard.html', {
             'game': game,
             'leaderboard': leaderboard,
-            'scores': scores[:100],
+            'scores': scores,
+            'period_offset': period_offset,
+            'period_start': period_start,
         })

@@ -2,7 +2,7 @@ import re
 import secrets
 from django.conf import settings
 from django.db import models
-from django.db.models import F
+from django.db.models import F, Q
 from django.utils import timezone
 from django.utils.text import slugify
 from datetime import timedelta
@@ -21,6 +21,12 @@ class Leaderboard(models.Model):
         ('correct_answer', 'Correct Answer'),
     ]
 
+    RESET_PERIOD_CHOICES = [
+        ('none', 'No reset (lifetime)'),
+        ('daily', 'Daily'),
+        ('weekly', 'Weekly'),
+    ]
+
     game = models.ForeignKey('games.Game', on_delete=models.CASCADE, related_name='leaderboards')
     name = models.CharField(max_length=100)
     slug = models.SlugField(max_length=100)
@@ -33,6 +39,12 @@ class Leaderboard(models.Model):
         default='score'
     )
     correct_answer = models.CharField(max_length=64, blank=True, null=True)
+    reset_period = models.CharField(
+        max_length=10,
+        choices=RESET_PERIOD_CHOICES,
+        default='none',
+        help_text='Reset the leaderboard each day/week. Past periods stay viewable.',
+    )
     show_score = models.BooleanField(default=True)
     show_date = models.BooleanField(default=False)
     min_scores_to_keep = models.PositiveIntegerField(default=10)
@@ -104,13 +116,60 @@ class Leaderboard(models.Model):
         else:  # desc
             return '-score'
 
-    def prune_excess_scores(self):
-        """Remove scores beyond max_scores limit, keeping best based on sort_order."""
-        order = self.get_score_ordering()
-        keep_ids = list(
-            self.scores.order_by(order).values_list('id', flat=True)[:self.max_scores]
-        )
-        return self.scores.exclude(id__in=keep_ids).delete()
+    def get_period_bounds(self, offset=0):
+        """Return (start, end) UTC datetimes for the reset period that is `offset`
+        periods before the current one (offset=0 is current, 1 is previous, ...).
+
+        Returns (None, None) for lifetime leaderboards (reset_period == 'none').
+        Daily periods run midnight-to-midnight UTC; weekly periods run Monday-to-Monday.
+        """
+        if self.reset_period == 'none':
+            return None, None
+
+        now = timezone.now()
+        # Midnight UTC at the start of today.
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        if self.reset_period == 'weekly':
+            # Monday is weekday() == 0.
+            week_start = day_start - timedelta(days=day_start.weekday())
+            start = week_start - timedelta(weeks=offset)
+            return start, start + timedelta(weeks=1)
+
+        # daily
+        start = day_start - timedelta(days=offset)
+        return start, start + timedelta(days=1)
+
+    def get_ordered_scores(self, period_offset=0):
+        """Return the visible scores for this leaderboard, filtered and ordered (best first).
+
+        Lifetime boards drop expired scores; period boards return only the requested
+        period's scores (period_offset periods back from the current one).
+        """
+        qs = self.scores.all()
+        if self.reset_period == 'none':
+            qs = qs.filter(Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now()))
+        else:
+            start, end = self.get_period_bounds(period_offset)
+            qs = qs.filter(created_at__gte=start, created_at__lt=end)
+        return qs.order_by(self.get_score_ordering())
+
+    def prune_excess_scores(self, period_offset=0):
+        """Remove scores beyond max_scores limit, keeping best based on sort_order.
+
+        For period boards, pruning is scoped to a single period so historical periods
+        are never wiped.
+        """
+        scoped = self.get_ordered_scores(period_offset)
+        keep_ids = list(scoped.values_list('id', flat=True)[:self.max_scores])
+        if self.reset_period == 'none':
+            to_delete = self.scores.exclude(id__in=keep_ids)
+        else:
+            start, end = self.get_period_bounds(period_offset)
+            to_delete = self.scores.filter(
+                created_at__gte=start, created_at__lt=end
+            ).exclude(id__in=keep_ids)
+        return to_delete.delete()
 
 
 class Score(models.Model):
@@ -121,7 +180,7 @@ class Score(models.Model):
     metadata = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    expires_at = models.DateTimeField()
+    expires_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ['-score']
@@ -136,7 +195,9 @@ class Score(models.Model):
 
     def save(self, *args, **kwargs):
         is_new = self.pk is None
-        if not self.expires_at:
+        # Period boards keep scores forever (past periods stay viewable), so they
+        # never get a TTL. Lifetime boards expire scores after SCORE_EXPIRATION_DAYS.
+        if not self.expires_at and self.leaderboard.reset_period == 'none':
             self.expires_at = timezone.now() + timedelta(days=settings.SCORE_EXPIRATION_DAYS)
         super().save(*args, **kwargs)
         if is_new:
