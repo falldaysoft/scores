@@ -21,6 +21,9 @@ class LeaderboardCreateView(LoginRequiredMixin, View):
             messages.success(request, f'Leaderboard "{leaderboard.name}" created!')
             if request.htmx:
                 return HttpResponse(status=204, headers={'HX-Redirect': f'/dashboard/games/{game.slug}/'})
+        else:
+            error = '; '.join(f'{field}: {", ".join(errs)}' for field, errs in form.errors.items())
+            messages.error(request, f'Could not create leaderboard. {error}')
         return redirect('games:game_detail', slug=game.slug)
 
 

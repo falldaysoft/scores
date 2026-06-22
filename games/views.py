@@ -43,7 +43,7 @@ class GameDetailView(LoginRequiredMixin, View):
     def get(self, request, slug):
         game = get_object_or_404(Game, slug=slug, owner=request.user)
         leaderboards = game.leaderboards.all()
-        leaderboard_form = LeaderboardForm()
+        leaderboard_form = LeaderboardForm(user=request.user)
         return render(request, 'games/game_detail.html', {
             'game': game,
             'leaderboards': leaderboards,
