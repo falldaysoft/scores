@@ -1,0 +1,87 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# One deploy at a time so runs don't overlap on the VM.
+concurrency:
+  group: deploy-ovm
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run migrations check
+        run: python manage.py makemigrations --check --dry-run --settings=scores.test_settings
+
+      - name: Run tests
+        run: python manage.py test --settings=scores.test_settings
+
+  build-and-deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The Oracle VM is arm64; amd64 is kept for local runs.
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: devops/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/falldaysoft/scores:latest
+            ghcr.io/falldaysoft/scores:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # The deploy key is restricted on the VM to running ~/apps/scores/deploy.sh,
+      # which receives the image tag as the SSH command.
+      - name: Deploy to Oracle VM
+        env:
+          OVM_DEPLOY_KEY: ${{ secrets.OVM_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$OVM_DEPLOY_KEY" > ~/.ssh/ovm_deploy
+          chmod 600 ~/.ssh/ovm_deploy
+          echo "ovm.fallday.ca ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJD//XNLAtsMdDvq+eyCeLbY8+xY8bqTFJk0dPhi13g6" >> ~/.ssh/known_hosts
+          ssh -i ~/.ssh/ovm_deploy -o StrictHostKeyChecking=yes ubuntu@ovm.fallday.ca "${{ github.sha }}"

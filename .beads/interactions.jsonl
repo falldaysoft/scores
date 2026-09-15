@@ -1,0 +1,1 @@
+{"id":"int-93b0464f68bfa7f7044771ede4a886b6","kind":"field_change","created_at":"2026-09-15T22:44:11.871242Z","actor":"Steve Tibbett","issue_id":"scores-7vu","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Compose stack, deploy key, CI workflow, data migration and docs done; commit + DNS remain with Steve"}}

@@ -1,0 +1,72 @@
+# scores.fallday.ca on the Oracle VM (ovm.fallday.ca), behind Traefik on infra-network.
+#
+# This file is the source of truth; copy it to ~/apps/scores/ on the VM when it
+# changes. .env there holds SECRET_KEY, DB_PASSWORD, EMAIL_HOST_USER,
+# EMAIL_HOST_PASSWORD and IMAGE_TAG (set by deploy.sh from CI). Postgres is the
+# shared `postgres` container on infra-network; the `scores` role and database
+# live there. Migrations and setup_demo_games run on container start, which is
+# what the Helm pre-upgrade hook used to do.
+#
+# Usage:
+#   docker compose pull && docker compose up -d
+#   docker compose run --rm cleanup       # expire old scores (host cron, daily 02:00 UTC)
+
+x-scores-env: &scores-env
+  DEBUG: "False"
+  SITE_URL: https://scores.fallday.ca
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_NAME: scores
+  DB_USER: scores
+  DB_PASSWORD: ${DB_PASSWORD}
+  SECRET_KEY: ${SECRET_KEY}
+  EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+  EMAIL_HOST: email-smtp.ca-central-1.amazonaws.com
+  EMAIL_PORT: "587"
+  EMAIL_USE_TLS: "true"
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD}
+  DEFAULT_FROM_EMAIL: noreply@fallday.ca
+  SCORE_EXPIRATION_DAYS: "7"
+
+services:
+  web:
+    image: ghcr.io/falldaysoft/scores:${IMAGE_TAG:-latest}
+    container_name: scores-web
+    restart: unless-stopped
+    environment: *scores-env
+    networks:
+      - infra-network
+    # Three workers stand in for the two 2-worker replicas the k8s deployment
+    # ran; signup sends mail synchronously, so keep a spare for a slow SMTP call.
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py setup_demo_games &&
+             gunicorn scores.wsgi:application --bind 0.0.0.0:8000 --workers 3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.scores.rule=Host(`scores.fallday.ca`)"
+      - "traefik.http.routers.scores.entrypoints=websecure"
+      - "traefik.http.routers.scores.tls=true"
+      - "traefik.http.routers.scores.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.scores.middlewares=compress@file"
+      - "traefik.http.services.scores.loadbalancer.server.port=8000"
+
+  # Replaces the k8s CronJob; run by host cron, never started by `up`.
+  cleanup:
+    image: ghcr.io/falldaysoft/scores:${IMAGE_TAG:-latest}
+    profiles: ["cron"]
+    environment: *scores-env
+    networks:
+      - infra-network
+    command: python manage.py cleanup_expired_scores
+
+networks:
+  infra-network:
+    external: true

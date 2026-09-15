@@ -5,7 +5,7 @@ This guide covers deploying Scores to your own infrastructure.
 ## Requirements
 
 - Docker
-- Kubernetes cluster (or Docker Compose for simpler setups)
+- Docker Compose (or any container host)
 - PostgreSQL database
 - SMTP server for email verification
 
@@ -67,45 +67,60 @@ docker run --rm \
   scores:latest python manage.py migrate
 ```
 
-## Kubernetes with Helm
+## Docker Compose behind Traefik
 
-The included Helm chart deploys the application with:
+`docker-compose.yml` is how scores.fallday.ca runs: one `web` service on a
+shared `infra-network` behind a Traefik container that terminates TLS, using a
+shared `postgres` container for the database. The compose file carries every
+non-secret setting inline; the secrets come from a `.env` next to it:
 
-- Deployment with 2 replicas
-- ClusterIP service on port 8000
-- Ingress (configure your hostname)
-- Migration job (runs on deploy)
-- CronJob for expired score cleanup (daily at 2 AM)
-
-### Setup
-
-1. Copy `secrets-placeholders.yaml` to `secrets.yaml`
-2. Fill in your base64-encoded secrets
-3. Apply secrets to your cluster:
-
-```bash
-kubectl apply -f devops/secrets.yaml
+```
+SECRET_KEY='...'          # single-quoted: compose interpolates $ in .env values
+DB_PASSWORD=...
+EMAIL_HOST_USER=...
+EMAIL_HOST_PASSWORD=...
+IMAGE_TAG=latest
 ```
 
-4. Install the Helm chart:
+The container's start command runs `migrate --noinput` and `setup_demo_games`
+before starting gunicorn, so migrations run on every deploy.
 
 ```bash
-helm install scores devops/helm/scores \
-  --set tag=latest \
-  --set hostname=scores.example.com
+cd ~/apps/scores
+docker compose pull && docker compose up -d   # deploy IMAGE_TAG
+docker compose logs -f web
+docker compose run --rm cleanup               # expire old scores
 ```
 
-### Updating
+To adapt it to another host, change the `Host()` rule and `SITE_URL`, and
+create the `scores` role and database in your Postgres first.
 
-```bash
-helm upgrade scores devops/helm/scores --set tag=v1.2.3
+### Deploying from CI
+
+`deploy.sh` is installed at `~/apps/scores/deploy.sh` on the host and set as a
+forced command for a dedicated SSH key in `~/.ssh/authorized_keys`:
+
 ```
+command="/home/ubuntu/apps/scores/deploy.sh",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty,restrict ssh-ed25519 AAAA... scores-ci-deploy
+```
+
+The GitHub Actions workflow (`.github/workflows/build-deploy.yml`) builds a
+multi-arch image (amd64 and arm64), pushes it to `ghcr.io/falldaysoft/scores`,
+then SSHes in with the `OVM_DEPLOY_KEY` repo secret, passing the commit sha as
+the command. The script validates the tag, writes it to `.env` as `IMAGE_TAG`,
+and runs `docker compose pull && up -d`.
+
+### Restoring a database dump
+
+`restore-from-dump.sh <file.dump>` stops the app, `pg_restore`s a custom-format
+dump into the `scores` database, and starts the app again.
 
 ## Maintenance
 
 ### Expired Score Cleanup
 
-Scores expire after 7 days by default. The Kubernetes deployment includes a CronJob that runs daily. For other deployments, schedule this command:
+Scores expire after 7 days by default. On the VM a host cron entry runs
+`docker compose run --rm cleanup` daily at 02:00 UTC. For other deployments, schedule this command:
 
 ```bash
 python manage.py cleanup_expired_scores
